@@ -80,6 +80,17 @@
     "_note": "催化学分：lookback_days内近期催化提升优先级；fallout_lookback_days无反应→标记落空评估"
   },
 
+  "3.0_exit_rules": {
+    "min_satisfied_items": 4,
+    "consecutive_days_warning": 2,
+    "consecutive_days_confirm": 5,
+    "observe_cooldown_days": 30,
+    "position_limit_degraded": 1,
+    "board_rank_warning": 5,
+    "board_rank_exit": 10,
+    "_note": "出池阈值：连续2日<4项→预警入观察区；连续5日→确认移出；观察区30日冷静期"
+  },
+
   "ice_freeze": {
     "freeze_below": 2000,
     "recover_days": 2,
