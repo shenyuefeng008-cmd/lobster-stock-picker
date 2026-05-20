@@ -56,7 +56,19 @@
     "top_n": 4
   },
   "2.0_sector": {
-    "min_sector_zt": 3,
+    "confirm_morning": {
+      "min_zt_count": 2,
+      "deadline_time": "11:30",
+      "board_gain_pct": 2,
+      "_note": "上午确认：11:30前≥2家涨停封死+板块涨幅>2%"
+    },
+    "confirm_full_day": {
+      "min_zt_count": 3,
+      "min_seal_minutes": 30,
+      "exclude_after": "14:50",
+      "_note": "全天确认：≥3家涨停且封板>30分钟；14:50后偷鸡涨停不计入"
+    },
+    "score_per_zt": 12,
     "score_per_zt": 12,
     "score_amount_cap": 30,
     "top_per_sector": 2,
@@ -94,7 +106,14 @@
       "_note": "轮动容错：买入价-7%硬止损；板块跌>3%+个股破MA5则板块止损"
     },
     "3.0": {
-      "tech_stop": "ma5_cross_ma10",
+      "tech_stop": {
+      "volume_break_threshold": 1.5,
+      "volume_break_confirm_days": 1,
+      "normal_confirm_days": 3,
+      "big_break_pct": 3,
+      "big_break_confirm_days": 2,
+      "_note": "放量下穿（>1.5倍均量）1日确认；缩量3日；大幅>3% 2日确认"
+    },
       "logic_stop": "catalyst_failed",
       "holding_enforced": true,
       "_note": "趋势持仓：技术止损（MA5<MA10）+逻辑止损（催化落空）；持有期强制"
@@ -130,7 +149,9 @@
   "ice_freeze": {
     "freeze_below": 2000,
     "recover_days": 2,
-    "recover_threshold": 2500
+    "recover_threshold": 2500,
+    "repair_confirm_threshold": 1700,
+    "_note": "冰点修复确认：连续2日>1700确认修复；连续2日>2500激活3.0"
   },
   "tracks": [
     "电力",
