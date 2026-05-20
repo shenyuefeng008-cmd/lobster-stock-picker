@@ -80,6 +80,35 @@
     "_note": "催化学分：lookback_days内近期催化提升优先级；fallout_lookback_days无反应→标记落空评估"
   },
 
+  "stop_loss": {
+    "1.0": {
+      "hard_stop_pct": -5,
+      "time_stop_days": 3,
+      "time_stop_condition": "not_zt",
+      "_note": "超短纪律：买入价-5%硬止损；第3日未涨停时间止损"
+    },
+    "2.0": {
+      "hard_stop_pct": -7,
+      "board_stop_pct": -3,
+      "board_stop_condition": "break_ma5",
+      "_note": "轮动容错：买入价-7%硬止损；板块跌>3%+个股破MA5则板块止损"
+    },
+    "3.0": {
+      "tech_stop": "ma5_cross_ma10",
+      "logic_stop": "catalyst_failed",
+      "holding_enforced": true,
+      "_note": "趋势持仓：技术止损（MA5<MA10）+逻辑止损（催化落空）；持有期强制"
+    }
+  },
+
+  "logic_disprove": {
+    "policy_reverse": true,
+    "tech_disrupt": true,
+    "catalyst_failed_days": 2,
+    "track_downgrade": "red_to_green",
+    "_note": "逻辑证伪判定：政策逆转/技术颠覆/催化日期过+2日无资金流入/赛道降级"
+  },
+
   "3.0_holding_rules": {
     "tier1_min_days": 5,
     "tier2_min_days": 3,
