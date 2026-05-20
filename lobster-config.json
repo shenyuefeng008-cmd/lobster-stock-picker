@@ -107,13 +107,13 @@
     },
     "3.0": {
       "tech_stop": {
-      "volume_break_threshold": 1.5,
-      "volume_break_confirm_days": 1,
-      "normal_confirm_days": 3,
-      "big_break_pct": 3,
-      "big_break_confirm_days": 2,
-      "_note": "放量下穿（>1.5倍均量）1日确认；缩量3日；大幅>3% 2日确认"
-    },
+        "volume_break_threshold": 1.5,
+        "volume_break_confirm_days": 1,
+        "normal_confirm_days": 3,
+        "big_break_pct": 3,
+        "big_break_confirm_days": 2,
+        "_note": "放量下穿（>1.5倍均量）1日确认；缩量3日；大幅>3% 2日确认"
+      },
       "logic_stop": "catalyst_failed",
       "holding_enforced": true,
       "_note": "趋势持仓：技术止损（MA5<MA10）+逻辑止损（催化落空）；持有期强制"
