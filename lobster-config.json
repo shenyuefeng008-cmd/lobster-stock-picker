@@ -80,6 +80,13 @@
     "_note": "催化学分：lookback_days内近期催化提升优先级；fallout_lookback_days无反应→标记落空评估"
   },
 
+  "3.0_holding_rules": {
+    "tier1_min_days": 5,
+    "tier2_min_days": 3,
+    "early_exit_condition": "logic_disproved_only",
+    "_note": "持有期硬约束：Tier-1≥5日、Tier-2≥3日；期间仅逻辑证伪可提前退出"
+  },
+
   "3.0_exit_rules": {
     "min_satisfied_items": 4,
     "consecutive_days_warning": 2,
