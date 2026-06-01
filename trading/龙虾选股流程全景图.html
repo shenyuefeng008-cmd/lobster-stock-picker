@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🦞 龙虾超短交易系统 — 全景流程图</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #131a2b;
+    --card-hover: #1a2340;
+    --border: #1e2d4a;
+    --accent: #f0a030;
+    --accent2: #3b82f6;
+    --accent3: #10b981;
+    --accent4: #ef4444;
+    --accent5: #8b5cf6;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    padding: 20px;
+  }
+  h1 { text-align:center; font-size:1.6rem; margin-bottom:8px; color:var(--accent); }
+  .subtitle { text-align:center; color:var(--text2); font-size:0.85rem; margin-bottom:24px; }
+  .legend {
+    display:flex; gap:16px; justify-content:center; flex-wrap:wrap;
+    margin-bottom:28px; padding:12px; background:var(--card); border-radius:8px;
+    border:1px solid var(--border);
+  }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text2); }
+  .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  .timeline { max-width:1100px; margin:0 auto; position:relative; }
+  .timeline::before {
+    content:''; position:absolute; left:20px; top:0; bottom:0;
+    width:2px; background:linear-gradient(to bottom, var(--accent), var(--accent2), var(--accent3), var(--accent5));
+  }
+  .tblock { margin-left:48px; margin-bottom:20px; position:relative; }
+  .tblock::before {
+    content:''; position:absolute; left:-32px; top:18px;
+    width:12px; height:12px; border-radius:50%; border:2px solid var(--accent);
+    background:var(--bg);
+  }
+  .tblock.c2::before { border-color:var(--accent2); }
+  .tblock.c3::before { border-color:var(--accent3); }
+  .tblock.c4::before { border-color:var(--accent5); }
+
+  .ttime {
+    font-size:0.75rem; font-weight:700; letter-spacing:0.5px;
+    padding:2px 8px; border-radius:4px; display:inline-block; margin-bottom:4px;
+  }
+  .c1 .ttime { background:rgba(240,160,48,0.15); color:var(--accent); }
+  .c2 .ttime { background:rgba(59,130,246,0.15); color:var(--accent2); }
+  .c3 .ttime { background:rgba(16,185,129,0.15); color:var(--accent3); }
+  .c4 .ttime { background:rgba(139,92,246,0.15); color:var(--accent5); }
+
+  .ttitle { font-size:1rem; font-weight:700; margin-bottom:6px; }
+  .tdesc { font-size:0.8rem; color:var(--text2); margin-bottom:8px; }
+
+  .flow { display:flex; flex-direction:column; gap:6px; }
+  .fnode {
+    display:flex; align-items:stretch; gap:8px;
+    padding:8px 12px; border-radius:8px;
+    background:var(--card); border:1px solid var(--border);
+    transition: background 0.2s;
+  }
+  .fnode:hover { background:var(--card-hover); }
+  .fnode .icon { font-size:1.1rem; flex-shrink:0; width:28px; text-align:center; padding-top:1px; }
+  .fnode .body { flex:1; min-width:0; }
+  .fnode .name { font-size:0.82rem; font-weight:600; }
+  .fnode .detail { font-size:0.75rem; color:var(--text2); margin-top:2px; }
+  .tag {
+    display:inline-block; font-size:0.65rem; padding:1px 6px;
+    border-radius:3px; margin-left:4px; font-weight:600;
+  }
+  .tag-data { background:rgba(59,130,246,0.15); color:var(--accent2); }
+  .tag-skill { background:rgba(16,185,129,0.15); color:var(--accent3); }
+  .tag-file { background:rgba(139,92,246,0.15); color:var(--accent5); }
+  .tag-alert { background:rgba(239,68,68,0.15); color:var(--accent4); }
+  .tag-push { background:rgba(240,160,48,0.15); color:var(--accent); }
+
+  .arrow { text-align:center; color:var(--text3); font-size:0.7rem; margin:2px 0; }
+
+  .section { max-width:1100px; margin:32px auto 0; }
+  .section-title {
+    font-size:1.1rem; font-weight:700; margin-bottom:16px;
+    padding-bottom:8px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:8px;
+  }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; }
+  .gcard {
+    padding:14px; border-radius:10px; background:var(--card);
+    border:1px solid var(--border); transition: background 0.2s;
+  }
+  .gcard:hover { background:var(--card-hover); }
+  .gcard .gtitle { font-size:0.88rem; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .gcard .gbody { font-size:0.78rem; color:var(--text2); }
+  .gcard .gbody code { background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px; font-size:0.73rem; }
+  .gcard table { width:100%; margin-top:6px; font-size:0.75rem; border-collapse:collapse; }
+  .gcard th { text-align:left; color:var(--text3); font-weight:500; padding:2px 6px; }
+  .gcard td { padding:2px 6px; color:var(--text2); }
+
+  .flow-mini { display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-top:6px; }
+  .flow-mini .fm-node {
+    font-size:0.7rem; padding:2px 8px; border-radius:4px;
+    background:rgba(255,255,255,0.05); color:var(--text2);
+  }
+  .flow-mini .fm-arrow { color:var(--text3); font-size:0.65rem; }
+
+  .footer { text-align:center; color:var(--text3); font-size:0.72rem; margin-top:36px; padding-top:16px; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<h1>🦞 龙虾超短交易系统 · 全景流程图</h1>
+<p class="subtitle">v2.1 · 三维度（点·线·面）· 8个定时任务 · 3个AI技能 · 5个数据源 · 27个文件</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>数据源</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>脚本/引擎</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>AI技能</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent5)"></div>数据文件</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>告警</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fff3"></div>推送</div>
+</div>
+
+<!-- ========== TIMELINE ========== -->
+<div class="timeline">
+
+  <!-- 07:00 盘前选股 -->
+  <div class="tblock c1">
+    <div class="ttime">07:00 周一至周五</div>
+    <div class="ttitle">📰 盘前选股</div>
+    <div class="tdesc">获取舆情 → 运行选股引擎 → 输出候选池 → 同步IMA → 更新关注股</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">📰</div>
+        <div class="body">
+          <div class="name">步骤0：盘前舆情速报 <span class="tag tag-skill">tencent-news</span></div>
+          <div class="detail">搜索"A股 板块 政策 热点"，检测重大事件影响情绪判定 → 写入 memory/YYYY-MM-DD.md</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">⚡</div>
+        <div class="body">
+          <div class="name">步骤1：确定性选股引擎 <span class="tag tag-data">akshare</span> <span class="tag tag-file">趋势容量池.md</span> <span class="tag tag-file">lobster-config.json</span></div>
+          <div class="detail">Python脚本 → 读取昨日涨停池/趋势容量池/配置参数 → 三维度过滤 → 输出候选</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📋</div>
+        <div class="body">
+          <div class="name">步骤2：格式化输出 → 步骤3：IMA同步 <span class="tag tag-skill">ima</span></div>
+          <div class="detail">写入 /tmp/lobster_premarket_candidates.json → 上传IMA知识库</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">👁️</div>
+        <div class="body">
+          <div class="name">步骤4：更新关注股.md → 步骤5：写入每日日志</div>
+          <div class="detail">覆盖写入 trading/关注股.md → 追加 memory/YYYY-MM-DD.md【盘前预测】</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <span class="tag tag-push">📤 推送元宝</span>
+      <span class="tag tag-alert">⚠️ 失败立即告警</span>
+    </div>
+  </div>
+
+  <!-- 09:25 竞价选股 -->
+  <div class="tblock c2">
+    <div class="ttime">09:25 周一至周五</div>
+    <div class="ttitle">💹 竞价选股</div>
+    <div class="tdesc">读取盘前候选 → 竞价数据过滤 → 更新关注股</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">📥</div>
+        <div class="body">
+          <div class="name">步骤1：读取候选池 → 构造竞价输入 <span class="tag tag-file">/tmp/lobster_premarket_candidates.json</span></div>
+          <div class="detail">内联Python转换格式 → 写入 /tmp/lobster_bid_input.json</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">🔍</div>
+        <div class="body">
+          <div class="name">步骤2：竞价过滤引擎 <span class="tag tag-data">qt.gtimg.cn</span></div>
+          <div class="detail">Python脚本 lobster_bid_filter_v2.py → 量比/涨幅/换手过滤 → 输出 /tmp/lobster_bid_result.json</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">✅</div>
+        <div class="body">
+          <div class="name">步骤3：更新关注股.md <span class="tag tag-file">关注股.md</span></div>
+          <div class="detail">覆盖写入 → IMA同步 → 复盘文件 /tmp/lobster_bid_{date}.md</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <span class="tag tag-push">📤 推送元宝</span>
+    </div>
+  </div>
+
+  <!-- 10:00-14:00 买点监控 -->
+  <div class="tblock c3">
+    <div class="ttime">10:00-11:00, 13:00-14:00 每小时</div>
+    <div class="ttitle">🎯 买点监控</div>
+    <div class="tdesc">校验数据链路 → 实时情绪面板 → 异动告警</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">🔍</div>
+        <div class="body">
+          <div class="name">前置校验：数据链路完整性</div>
+          <div class="detail">检查 premarket_candidates.json + bid_result.json + 关注股.md 是否存在且非空</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📊</div>
+        <div class="body">
+          <div class="name">实时情绪面板 <span class="tag tag-data">qt.gtimg.cn</span> <span class="tag tag-data">legulegu.com</span></div>
+          <div class="detail">上证/深证/创业板涨跌 + 涨跌家数 → 维度判定 → 告警检查（冰点/高潮/炸板率）</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">🔔</div>
+        <div class="body">
+          <div class="name">告警规则 <span class="tag tag-alert">紧急</span></div>
+          <div class="detail">涨跌家数&lt;1500 🚨冰点 | &gt;3500 🔴极度高潮 | 炸板率&gt;35% ⚠️风险</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <span class="tag tag-push">📤 推送元宝（bestEffort）</span>
+    </div>
+  </div>
+
+  <!-- 11:30 午间复盘 -->
+  <div class="tblock c2">
+    <div class="ttime">11:30 周一至周五</div>
+    <div class="ttitle">☀️ 午间复盘</div>
+    <div class="tdesc">数据链路校验 → 上午情绪面板 → 规则一致性检查 → 热点板块扫描</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">📋</div>
+        <div class="body">
+          <div class="name">步骤0-1：校验 + 规则读取 <span class="tag tag-file">lobster-rules.md</span> <span class="tag tag-file">HEARTBEAT.md</span></div>
+          <div class="detail">校验4个/tmp文件 + 读取核心规则前80行</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📊</div>
+        <div class="body">
+          <div class="name">步骤2：实时数据采集 <span class="tag tag-data">qt.gtimg.cn</span> <span class="tag tag-data">legulegu.com</span> <span class="tag tag-data">akshare</span></div>
+          <div class="detail">指数行情 + 涨跌家数 + 板块涨幅 + 涨停池 → 构建上午情绪面板</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📈</div>
+        <div class="body">
+          <div class="name">步骤3：热点板块 + 步骤4：写午间笔记</div>
+          <div class="detail">板块TOP5 + 关注股表现 → 写入 /tmp/lobster_midday_{date}.md → 追加 memory/日志</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12:30 规则校验 -->
+  <div class="tblock c4">
+    <div class="ttime">12:30 周一至周五</div>
+    <div class="ttitle">🔧 规则一致性校验</div>
+    <div class="tdesc">verify_rules.sh 扫描 19 个文件/任务的一致性</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">✅</div>
+        <div class="body">
+          <div class="name">自动化校验脚本 <span class="tag tag-file">verify_rules.sh</span></div>
+          <div class="detail">检查文件存在性(8个) + cron任务一致性(7个) + Python脚本(3个) + trading-state.json + lobstrules版本 + 文件大小</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 15:05 收盘复盘 -->
+  <div class="tblock c1">
+    <div class="ttime">15:05 周一至周五</div>
+    <div class="ttitle">📝 收盘复盘</div>
+    <div class="tdesc">前置校验 → 数据采集 → 复盘模板9章节 → 选股历史 → IMA同步 → xlsx导出</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">📋</div>
+        <div class="body">
+          <div class="name">步骤0-1：校验 + 复盘模板 <span class="tag tag-file">复盘模板.md</span> <span class="tag tag-file">/tmp/lobster_midday_{date}.md</span></div>
+          <div class="detail">校验盘前/竞价/午间数据 → 读取复盘模板</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📊</div>
+        <div class="body">
+          <div class="name">步骤2-3：市场数据 + 涨停池 <span class="tag tag-data">qt.gtimg.cn</span> <span class="tag tag-data">legulegu.com</span> <span class="tag tag-data">akshare</span></div>
+          <div class="detail">指数/涨跌家数 + 涨停池（含二次验证）+ 关注股行情</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📝</div>
+        <div class="body">
+          <div class="name">步骤4：按复盘模板输出9章节 <span class="tag tag-file">关注股.md</span> <span class="tag tag-file">lobster-rules.md</span></div>
+          <div class="detail">情绪面板 + 涨停分析 + 维度执行 + 关注股表现 + 打分 + 买点触发 + 卖点触发 + 仓位管理 + 下日计划</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">💾</div>
+        <div class="body">
+          <div class="name">步骤5-7：选股历史 + IMA同步 + 推送 <span class="tag tag-file">选股历史.md</span> <span class="tag tag-skill">ima</span></div>
+          <div class="detail">追加选股历史 → IMA知识库同步 → 推送复盘摘要</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📊</div>
+        <div class="body">
+          <div class="name">步骤8：结构化导出 <span class="tag tag-skill">xlsx</span> <span class="tag tag-file">复盘数据库.xlsx</span></div>
+          <div class="detail">openpyxl追加一行：日期/维度/标的/行情/打分/命中 → 按日期去重</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <span class="tag tag-push">📤 推送元宝</span>
+      <span class="tag tag-alert">⚠️ 失败立即告警</span>
+    </div>
+  </div>
+
+  <!-- 00:00 每日进化 -->
+  <div class="tblock c3">
+    <div class="ttime">00:00 每日</div>
+    <div class="ttitle">🧬 每日进化优化</div>
+    <div class="tdesc">参数校验 → 配置优化 → 打分模型调优</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">🔧</div>
+        <div class="body">
+          <div class="name">读取配置 + 昨日日志 <span class="tag tag-file">lobster-config.json</span> <span class="tag tag-file">MEMORY.md</span></div>
+          <div class="detail">对比昨日选股结果与实际表现 → 计算命中率</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">⚙️</div>
+        <div class="body">
+          <div class="name">参数调优 + 打分模型更新</div>
+          <div class="detail">修改 lobster-config.json（用jq/python3保证JSON格式）→ 验证选股引擎输出 → 同步IMA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 周日20:00 产业图谱进化 -->
+  <div class="tblock c4">
+    <div class="ttime">周日 20:00 每周</div>
+    <div class="ttitle">🗺️ 产业图谱深度进化</div>
+    <div class="tdesc">规则自检 → 多引擎搜索11赛道 → 产业框架更新 → 催化日历填充</div>
+    <div class="flow">
+      <div class="fnode">
+        <div class="icon">✅</div>
+        <div class="body">
+          <div class="name">步骤0：规则一致性自检 <span class="tag tag-file">lobster-rules.md</span> <span class="tag tag-file">verify_rules.sh</span></div>
+          <div class="detail">v2.1版本 + 文件大小 + 关键规则完整性检查</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">🔍</div>
+        <div class="body">
+          <div class="name">步骤2.1：多引擎搜索赛道动态 <span class="tag tag-skill">online-search</span> <span class="tag tag-data">qt.gtimg.cn</span> <span class="tag tag-data">legulegu.com</span></div>
+          <div class="detail">11个赛道逐一搜索（IDC/液冷/光模块/存储/芯片/电源/能源/光纤/大模型等）→ 每赛道间隔2秒</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">🗺️</div>
+        <div class="body">
+          <div class="name">步骤3-4：框架优化 + 文件更新 <span class="tag tag-file">产业逻辑框架.md</span> <span class="tag tag-file">趋势容量池.md</span> <span class="tag tag-file">催化日历.md</span></div>
+          <div class="detail">更新赛道状态/轮动节奏 → 均线验证趋势池 → 填充催化日历</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="fnode">
+        <div class="icon">📤</div>
+        <div class="body">
+          <div class="name">步骤5-7：进化笔记 + IMA同步 + 用户汇报 <span class="tag tag-skill">ima</span></div>
+          <div class="detail">输出进化笔记 /tmp/lobster_evolution_{date}.md → IMA同步 → 汇报变更摘要</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /timeline -->
+
+<!-- ========== DATA SOURCES ========== -->
+<div class="section">
+  <div class="section-title">📡 数据源速查</div>
+  <div class="grid">
+    <div class="gcard">
+      <div class="gtitle">🌐 腾讯行情接口</div>
+      <div class="gbody">
+        <code>qt.gtimg.cn/q=sh000001,sz399001,sz399006</code><br>
+        用途：指数实时行情、个股涨跌<br>
+        编码：GB2312 → UTF-8<br>
+        频率：交易日 9:15-15:00 实时<br>
+        使用方：买点监控、午间、收盘、进化
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📊 乐咕乐股</div>
+      <div class="gbody">
+        <code>legulegu.com/stockdata/market-activity</code><br>
+        用途：涨跌家数（情绪面板核心）<br>
+        提取：meta content 字段<br>
+        注意：非交易时段无数据，需处理空值<br>
+        使用方：盘前引擎、买点监控、午间、收盘
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📈 AKShare</div>
+      <div class="gbody">
+        Python库，三种核心接口：<br>
+        <code>stock_zt_pool_em()</code> 涨停池<br>
+        <code>stock_zh_a_hist()</code> 个股K线/均线<br>
+        <code>stock_board_industry_name_em()</code> 板块涨幅<br>
+        注意：板块接口偶超时，建议重试<br>
+        使用方：盘前引擎、午间、收盘、进化
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📰 腾讯新闻 (tencent-news)</div>
+      <div class="gbody">
+        CLI工具，需 get-token.sh 鉴权<br>
+        搜索关键词："A股 板块 政策 热点"<br>
+        用途：盘前舆情速报（重大事件检测）<br>
+        使用方：仅盘前选股步骤0<br>
+        状态：✅ token可用
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">🔍 元宝搜索 (online-search)</div>
+      <div class="gbody">
+        Node.js 脚本 prosearch.cjs<br>
+        用途：11个赛道逐一搜索最新动态<br>
+        限流：每赛道间隔2秒<br>
+        使用方：仅周日产业图谱进化步骤2.1<br>
+        状态：✅ 可用
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== /tmp DATA FLOW ========== -->
+<div class="section">
+  <div class="section-title">🔗 /tmp 数据流转链路</div>
+  <div class="grid">
+    <div class="gcard">
+      <div class="gtitle">📦 premarket_candidates.json</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>lobster_premarket_engine.py (07:00)</td></tr>
+          <tr><th>读取</th><td>竞价(09:25)、买点监控(整点)、午间(11:30)、收盘(15:05)</td></tr>
+          <tr><th>Fallback</th><td style="color:var(--accent3)">✅ 收盘任务有前置存在性检查</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📦 bid_input.json</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>CRON_BID_TASK 内联Python (09:25)</td></tr>
+          <tr><th>读取</th><td>lobster_bid_filter_v2.py</td></tr>
+          <tr><th>来源</th><td>从 premarket_candidates.json 转换</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📦 bid_result.json</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>lobster_bid_filter_v2.py (09:25)</td></tr>
+          <tr><th>读取</th><td>买点监控、午间、收盘</td></tr>
+          <tr><th>Fallback</th><td style="color:var(--accent3)">✅ 收盘任务有前置存在性检查</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📄 midday_{date}.md</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>CRON_MIDDAY_TASK (11:30)</td></tr>
+          <tr><th>读取</th><td>CRON_CLOSING_TASK 步骤0 前置校验</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📄 bid_{date}.md</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>CRON_BID_TASK (09:25)</td></tr>
+          <tr><th>用途</th><td>竞价选股复盘记录</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📊 复盘数据库.xlsx</div>
+      <div class="gbody">
+        <table>
+          <tr><th>写入</th><td>CRON_CLOSING_TASK 步骤8 (openpyxl)</td></tr>
+          <tr><th>去重</th><td style="color:var(--accent3)">✅ 按日期查重，有则更新</td></tr>
+          <tr><th>字段</th><td>日期/维度/标的/代码/开盘/收盘/涨幅/打分/竞价量比/涨停数/涨跌家数/情绪/命中</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CORE FILES ========== -->
+<div class="section">
+  <div class="section-title">📂 核心文件架构</div>
+  <div class="grid">
+    <div class="gcard">
+      <div class="gtitle">⚡ 引擎脚本 (scripts/)</div>
+      <div class="gbody">
+        <div class="flow-mini">
+          <span class="fm-node">lobster_premarket_engine.py</span>
+          <span class="fm-arrow">→</span>
+          <span class="fm-node">lobster_bid_filter_v2.py</span>
+          <span class="fm-arrow">→</span>
+          <span class="fm-node">scoring_calculator.py</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">lobster_backtest.py</span>
+          <span class="fm-node">verify_rules.sh</span>
+          <span class="fm-node">ima_sync.sh</span>
+        </div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📜 规则文件 (根目录)</div>
+      <div class="gbody">
+        <div class="flow-mini">
+          <span class="fm-node">lobster-rules.md</span>
+          <span class="fm-node">lobster-config.json</span>
+          <span class="fm-node">HEARTBEAT.md</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">SOUL.md</span>
+          <span class="fm-node">MEMORY.md</span>
+          <span class="fm-node">AGENTS.md</span>
+        </div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">🗂️ 交易数据 (trading/)</div>
+      <div class="gbody">
+        <div class="flow-mini">
+          <span class="fm-node">关注股.md</span>
+          <span class="fm-node">趋势容量池.md</span>
+          <span class="fm-node">产业逻辑框架.md</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">选股历史.md</span>
+          <span class="fm-node">复盘模板.md</span>
+          <span class="fm-node">交易追踪.md</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">heartbeat-rules-full.md</span>
+          <span class="fm-node">催化日历.md</span>
+          <span class="fm-node">数据验证规则.md</span>
+        </div>
+      </div>
+    </div>
+    <div class="gcard">
+      <div class="gtitle">📝 Cron指令 (scripts/cron-tasks/)</div>
+      <div class="gbody">
+        <div class="flow-mini">
+          <span class="fm-node">CRON_PREMARKET</span>
+          <span class="fm-node">CRON_BID</span>
+          <span class="fm-node">CRON_BUYPOINT</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">CRON_MIDDAY</span>
+          <span class="fm-node">CRON_CLOSING</span>
+          <span class="fm-node">CRON_DAILY_EVOLUTION</span>
+        </div>
+        <div class="flow-mini" style="margin-top:4px">
+          <span class="fm-node">CRON_EVOLUTION</span>
+          <span class="fm-node">CRON_RULES_CHECK</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== EMOTION MODEL ========== -->
+<div class="section">
+  <div class="section-title">🎭 情绪周期 → 维度映射</div>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(220px, 1fr))">
+    <div class="gcard" style="border-left:3px solid var(--accent4)">
+      <div class="gtitle">🚨 冰点 &lt;1500</div>
+      <div class="gbody">主导维度：1.0 点（打板）<br>仓位上限：5成<br>策略：一进二 + 分歧低吸</div>
+    </div>
+    <div class="gcard" style="border-left:3px solid var(--accent)">
+      <div class="gtitle">⚡ 温和 1500-2500</div>
+      <div class="gbody">主导维度：1.0 + 3.0<br>总仓位上限：9成（分3仓）<br>策略：打板 + 趋势低吸</div>
+    </div>
+    <div class="gcard" style="border-left:3px solid var(--accent3)">
+      <div class="gtitle">🔥 活跃 2500-3500</div>
+      <div class="gbody">主导维度：2.0 + 1.0<br>仓位：5-7成<br>策略：板块卡位 + 高低切</div>
+    </div>
+    <div class="gcard" style="border-left:3px solid var(--accent5)">
+      <div class="gtitle">🔴 极度高潮 &gt;3500</div>
+      <div class="gbody">主导维度：辅助模式<br>仓位：1-2成<br>策略：只卖不买，等分歧</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  🦞 龙虾超短交易系统 v2.1 · 2026-05-19 · workspace-1gwpiwf3hr163jz5 · 8 cron tasks · 5 data sources · 3 AI skills · 27 files
+</div>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-# 龙虾产业图谱深度进化 — cron 任务指令 (v2.1)
+# 龙虾产业图谱深度进化 — cron 任务指令 (v2.2 自动进化版)
 
 > 本文件由 20:00（周日）cron 任务触发时读取，请勿删除。
 > **必须遵循 `lobster-rules.md` v2.4 全部硬约束**
@@ -159,9 +159,19 @@ PYEOF
 
 > ⚡ 改完配置后重新跑步骤2.3验证效果即可，无需改脚本。
 
----
+## 🔧 自动进化规则（v2.2 核心）
 
-**注意：**
+**与每日进化 v8 一致：发现问题 = 立即修复！**
+
+- 赛道状态变化 → 直接改 `产业逻辑框架.md`
+- 新赛道爆发 → 直接加入框架 + 更新 `lobster-config.json` tracks
+- 趋势池异常 → 直接重跑 `lobster_trend_pool_updater.py`
+- 种子股需增删 → 直接改 `lobster-config.json` stock_codes
+- 规则不一致 → 直接改 `lobster-rules.md` + 验证
+
+**所有变更必须验证：改完→重跑→确认输出正确→再汇报**
+
+---
 - 若遇腾讯API限流，单个请求失败跳过该股，不影响整体
 - 写入完成后将更新摘要写入进化笔记
 
@@ -180,12 +190,12 @@ curl -s -L --max-time 15 \
 
 ## 步骤3：提出产业图谱优化建议
 
-输出进化建议（0-3条），格式：
+输出自动进化报告（0-3条），格式：
 ```
-- 建议N：xxx（如"补充化工链到产业逻辑框架"）
+- 进化N：xxx
   - 理由：xxx（基于本周板块表现）
-  - 预期效果：xxx
-  - 执行方式：修改 产业逻辑框架.md 第X章
+  - 动作：已修改 产业逻辑框架.md 第X章 / lobster-config.json tracks / 趋势容量池.md
+  - 验证：✅ 重跑通过
 ```
 
 **建议类型**（优先级排序）：
@@ -238,6 +248,74 @@ echo "✅ 待审核赛道处理完成"
 
 ---
 
+## 步骤3.8：BUG_LOG 周日回顾检查（新增！）
+
+> **目标**：检查本周是否出现 BUG_LOG.md 中已记录同类错误的复现
+
+### 3.8.1 读取 BUG_LOG
+
+```bash
+BUG_LOG="/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/BUG_LOG.md"
+if [ -f "$BUG_LOG" ]; then
+    echo "📋 BUG_LOG 已找到，开始回顾检查..."
+    # 统计 P0/P1 条目数
+    P0_COUNT=$(grep -c "^## BUG-\|^## ERROR-" "$BUG_LOG" | head -20)
+    echo "  P0/P1 条目数：$P0_COUNT"
+else
+    echo "⚠️ BUG_LOG.md 不存在，跳过回顾"
+fi
+```
+
+### 3.8.2 逐条检查 P0/P1 错误
+
+对 BUG_LOG.md 中每条 P0/P1 记录，执行：
+
+**检查步骤**：
+1. 读取该 BUG 的「根因」和「预防措施」
+2. 检查本周（过去7天）的 `memory/YYYY-MM-DD.md` 日志
+3. 搜索是否有同类错误复现（关键词匹配根因）
+4. 决策：✅ 未复现 / ⚠️ 疑似复现 / ❌ 已复现
+
+**如果结论为「⚠️ 疑似复现」或「❌ 已复现」**：
+- 立即修复（遵循「发现问题=立即修复」原则）
+- 更新 BUG_LOG.md 对应该条记录的「修复状态」
+- 记录到进化笔记
+
+**如果结论为「✅ 未复现」**：
+- 记录到进化笔记（作为系统稳定性证据）
+
+### 3.8.3 生成 BUG 回顾报告
+
+将检查结果写入进化笔记（步骤5的 OUTPUT 文件）：
+
+```bash
+DATE=$(date +%Y-%m-%d)
+OUTPUT="/tmp/lobster_evolution_${DATE}.md"
+# 在 OUTPUT 中追加以下内容
+cat >> "$OUTPUT" << 'BUG_REPORT'
+
+## BUG_LOG 周日回顾（YYYY-MM-DD）
+
+| BUG ID | 类型 | 状态 | 备注 |
+|--------|------|------|------|
+| BUG-010 | P0 | ✅ 未复现 | market_value 修复后稳定运行 |
+| BUG-012 | P0 | ✅ 未复现 | 仓位计算已修正 |
+| ERROR-009 | P1 | ⚠️ 需观察 | cron prompt 偶尔无输出 |
+
+结论：系统稳定性良好，未发现同类错误复现。
+BUG_REPORT
+```
+
+> ⚡ 实际执行时，BUG ID 列表从 BUG_LOG.md 动态读取，不硬编码
+
+### 3.8.4 更新 BUG_LOG（如需要）
+
+如果发现有错误复现且已修复：
+- 直接编辑 `trading/BUG_LOG.md`，更新对应条目的「修复状态」字段
+- 记录修复日期和版本号
+
+---
+
 ## 步骤4：更新本地文件
 
 - 更新 `trading/产业逻辑框架.md`（如有新赛道或状态变化）
@@ -286,7 +364,7 @@ OUTPUT="/tmp/lobster_evolution_${DATE}.md"
 ```bash
 bash "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/ima_sync.sh" \
   "/tmp/lobster_evolution_${DATE}.md" \
-  "龙虾产业图谱深度进化 ${DATE}"
+  "龙虾产业图谱深度进化 ${DATE}" 2>>/tmp/ima-errors.log
 ```
 
 **注意**：`ima_sync.sh` 会自动 add_knowledge 到「ai自动选股」KB的「产业资料」文件夹（folder_id: 7460511297852038）
@@ -324,3 +402,15 @@ bash "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/ima_sync.sh" 
 - 如果自检发现产业逻辑框架缺少最新赛道，立即更新
 - 如果趋势容量池超过3天未更新，重新计算
 - 修复完成后，在下一次进化日记中记录修复内容
+
+
+## 最后步骤：回复用户（必须执行）
+
+> **关键**：你已执行完所有步骤，生成了任务输出
+> **必须**：立即回复用户，将结果完整发送给用户
+> **禁止**：NO_REPLY、不回复、只写文件不推送
+>
+> 回复格式：
+> ```
+> [任务对应的输出内容]
+> ```

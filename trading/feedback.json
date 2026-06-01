@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "description": "全系统反馈数据 — 自动进化调参",
+    "version": "2.0",
+    "created": "2026-05-24",
+    "last_updated": "2026-05-30"
+  },
+  "L1_emotion": {
+    "records": [
+      {
+        "date": "2026-05-22",
+        "yesterday": 3356,
+        "today": 3735,
+        "predicted_dimension": "辅助"
+      },
+      {
+        "date": "2026-05-26",
+        "time": "15:06",
+        "actual_up": 1314,
+        "actual_down": 3811,
+        "actual_emo": "偏弱",
+        "actual_dim": "1.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 3
+      },
+      {
+        "date": "2026-05-27",
+        "time": "15:07",
+        "actual_up": 934,
+        "actual_down": 4213,
+        "actual_emo": "冰点",
+        "actual_dim": "1.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 3
+      },
+      {
+        "date": "2026-05-28",
+        "time": "15:06",
+        "actual_up": 2748,
+        "actual_down": 2321,
+        "actual_emo": "高潮",
+        "actual_dim": "2.0+1.0",
+        "early_up": 2475,
+        "early_emo": "✅正常→1.0+3.0",
+        "pos_limit": 7
+      },
+      {
+        "date": "2026-05-29",
+        "time": "15:12",
+        "actual_up": 1446,
+        "actual_down": 3672,
+        "actual_emo": "偏弱",
+        "actual_dim": "1.0",
+        "early_up": 2115,
+        "early_emo": "✅正常→1.0+3.0",
+        "pos_limit": 3
+      }
+    ],
+    "stats": {
+      "total_predictions": 5,
+      "last_updated": "2026-05-30"
+    },
+    "parameter_adjustments": []
+  },
+  "L2_catalyst": {
+    "records": [],
+    "stats": {
+      "total_scored": 8,
+      "verified_count": 1,
+      "correct": 1
+    },
+    "weight_adjustments": []
+  },
+  "L3_strategy": {
+    "records": [],
+    "stats": {
+      "total_candidates": 0,
+      "selected_count": 0
+    }
+  },
+  "L4_execution": {
+    "records": [],
+    "stats": {
+      "total_trades": 10,
+      "veto_reasons": {
+        "1.0硬止损触发": 1,
+        "1.0分歧低吸硬止损：回撤-7.00% ≤ -5%": 1
+      }
+    }
+  },
+  "parameter_evolution": {
+    "last_adjustment": "2026-05-30",
+    "config_version": "1.9",
+    "adjustment_history": [
+      {
+        "date": "2026-05-30",
+        "applied": [
+          {
+            "target": "2.0板块卡位.score",
+            "action": " 15→18 (收紧评分门槛)",
+            "applied": true
+          }
+        ]
+      }
+    ],
+    "performance_baseline": {
+      "win_rate": 60.0,
+      "avg_pnl_pct": 0.38,
+      "total_closed_trades": 10
+    }
+  }
+}

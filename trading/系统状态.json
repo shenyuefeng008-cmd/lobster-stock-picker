@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "version": 2,
+    "purpose": "系统状态·统一文件"
+  },
+  "last_updated": "2026-06-01",
+  "last_close_date": "2026-06-01",
+  "yesterday": {
+    "up_count": 1446,
+    "date": "2026-05-29"
+  },
+  "today": {
+    "up_count": 3513,
+    "down_count": 1629,
+    "zt_count": 120,
+    "dt_count": 25,
+    "dimension": "极度高潮"
+  }
+}

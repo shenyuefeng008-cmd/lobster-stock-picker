@@ -1,0 +1,689 @@
+#!/usr/bin/env python3
+"""
+龙虾盘前选股引擎 v1.0 — 确定性硬脚本
+数据源：legulegu(涨跌家数) + qt.gtimg.cn(指数) + akshare(涨停池/连板池) + 趋势容量池.md(3.0)
+输出：/tmp/lobster_premarket_candidates.json + stdout
+
+用法：python3 /tmp/lobster_premarket_engine_v1.py
+"""
+
+import json, subprocess, re, sys, datetime, os
+from pathlib import Path
+
+# 确保scripts/目录在sys.path，使catalyst_scoring可被import
+SCRIPT_DIR = Path(__file__).parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+# ==================== 催化剂评分集成 ====================
+try:
+    from catalyst_scoring import calculate_catalyst_score, get_catalyst_action
+    CATALYST_AVAILABLE = True
+except ImportError:
+    CATALYST_AVAILABLE = False
+    print("  ⚠️ catalyst_scoring模块未找到，跳过催化剂评分", file=sys.stderr)
+
+# ==================== 配置（从外部JSON加载，进化任务修改JSON即可） ====================
+
+CONFIG_PATH = Path(__file__).parent.parent / 'lobster-config.json'
+
+# 内置默认值（仅当配置文件不存在时使用）
+_DEFAULT_CONFIG = {
+    'emotion': {
+        'below_1500': {'dim': '1.0', 'aux': '无', 'pos_limit': 5},
+        '1500_2000': {'dim': '1.0', 'aux': '无', 'pos_limit': 5},
+        '2000_2500': {'dim': '1.0', 'aux': '3.0', 'pos_limit': 9},
+        '2500_3500': {'dim': '2.0', 'aux': '1.0', 'pos_limit': 7},
+        'above_3500': {'dim': '辅助', 'aux': '无', 'pos_limit': 2},
+    }
+}
+
+def load_config():
+    if CONFIG_PATH.exists():
+        with open(CONFIG_PATH) as f:
+            cfg = json.load(f)
+        print(f"  ✅ 配置文件: lobster-config.json v{cfg.get('_meta',{}).get('version','?')} ({cfg.get('_meta',{}).get('last_updated','?')})")
+        return cfg
+    else:
+        print(f"  ⚠️ 配置文件不存在({CONFIG_PATH})，使用内置默认值")
+        return {'emotion': _DEFAULT_CONFIG['emotion']}
+
+EMOTION_RULES = load_config().get('emotion', _DEFAULT_CONFIG['emotion'])
+
+# ==================== 工具函数 ====================
+
+def run(cmd, timeout=20):
+    r = subprocess.run(cmd, shell=True, capture_output=True, timeout=timeout)
+    try:
+        return r.stdout.decode('utf-8').strip()
+    except UnicodeDecodeError:
+        return r.stdout.decode('gbk', errors='replace').strip()
+
+def get_index():
+    raw = run("curl -s 'https://qt.gtimg.cn/q=sh000001,sz399001,sz399006'")
+    indices = {}
+    for line in raw.split(';'):
+        m = re.search(r'v_(\w+)="([^"]*)"', line)
+        if m:
+            p = m.group(2).split('~')
+            if len(p) > 32:
+                indices[m.group(1)] = {
+                    'name': p[1], 'price': p[3], 'yest': p[4],
+                    'change': float(p[32]) if p[32] else 0
+                }
+    return indices
+
+def get_advance_decline():
+    raw = run(
+        "curl -s -L --max-time 15 "
+        "-A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' "
+        "'https://legulegu.com/stockdata/market-activity'",
+        timeout=20
+    )
+    m = re.search(r'content="(2026-[^"]+)"', raw)
+    if not m:
+        return None
+    text = m.group(1)
+    result = {}
+    m2 = re.search(r'(\d+)家上涨[，,]\s*(\d+)家下跌', text)
+    if m2:
+        result['up'] = int(m2.group(1))
+        result['down'] = int(m2.group(2))
+    m3 = re.search(r'(\d+)家涨停', text)
+    if m3:
+        result['zt'] = int(m3.group(1))
+    m4 = re.search(r'(\d+)家跌停', text)
+    if m4:
+        result['dt'] = int(m4.group(1))
+    return result if 'up' in result else None
+
+def get_yesterday_date():
+    today = datetime.date.today()
+    if today.weekday() == 0:  # 周一
+        delta = 3
+    else:
+        delta = 1
+    return today - datetime.timedelta(days=delta)
+
+def get_yesterday_zt():
+    """昨日涨停池（股票昨天涨停，今天的表现）"""
+    yesterday = get_yesterday_date()
+    date_str = yesterday.strftime('%Y%m%d')
+    try:
+        raw = run(f"python3 -c \"import akshare as ak, warnings; warnings.filterwarnings('ignore'); df=ak.stock_zt_pool_previous_em(date='{date_str}'); print(df.to_json(orient='records',force_ascii=False))\"")
+        if raw:
+            return json.loads(raw), yesterday.strftime('%Y-%m-%d')
+    except Exception as e:
+        print(f"  ⚠️ 昨日涨停池获取失败: {e}", file=sys.stderr)
+    return [], yesterday.strftime('%Y-%m-%d')
+
+def get_zt_sub():
+    """连板股池"""
+    yesterday = get_yesterday_date()
+    date_str = yesterday.strftime('%Y%m%d')
+    try:
+        raw = run(f"python3 -c \"import akshare as ak, warnings; warnings.filterwarnings('ignore'); df=ak.stock_zt_pool_sub_new_em(date='{date_str}'); print(df.to_json(orient='records',force_ascii=False))\"")
+        if raw:
+            return json.loads(raw)
+    except:
+        pass
+    return []
+
+def get_trend_pool():
+    """从趋势容量池.md解析标的"""
+    pool_path = Path("/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/趋势容量池.md")
+    stocks = []
+    if not pool_path.exists():
+        return stocks
+    in_pool = False
+    for line in pool_path.read_text().split('\n'):
+        if '当前池中' in line:
+            in_pool = True
+            continue
+        if in_pool and line.startswith('|') and '代码' not in line and '---' not in line and '标的' not in line:
+            parts = [p.strip() for p in line.split('|')]
+            # v2.1表结构: 标的|代码|赛道|赛道状态|MA5|MA10|MA20|5日均额(亿)|总市值(亿)|总分|入池理由
+            if len(parts) >= 11 and parts[1] and parts[2]:
+                stocks.append({
+                    'name': parts[1], 'code': parts[2],
+                    'track': parts[3],
+                    'status': parts[4],  # 🔴/🟡/🟢 赛道状态
+                    'ma': parts[6],       # MA10（均线参考值）
+                    'close': parts[7],    # MA20
+                    'amount': parts[8],   # 5日均额(亿)
+                    'market_cap': parts[9], # 总市值(亿)
+                    'note': parts[11] if len(parts) > 11 else ''
+                })
+        if in_pool and line.startswith('##'):
+            break
+    return stocks
+
+def determine_emotion(ad):
+    up = ad['up']
+    if up < 1500:
+        return EMOTION_RULES['below_1500']
+    elif up < 2000:
+        return EMOTION_RULES['1500_2000']
+    elif up < 2500:
+        return EMOTION_RULES['2000_2500']
+    elif up < 3500:
+        return EMOTION_RULES['2500_3500']
+    else:
+        return EMOTION_RULES['above_3500']
+
+def emotion_triple_check_premarket(emotion, yesterday_up):
+    """盘前情绪三重校验（v2.5规则）"""
+    today_up = emotion.get('up_count', 0)
+    corrections = []
+    
+    # 校验1：剧烈波动日
+    if yesterday_up and yesterday_up > 0:
+        delta = abs(today_up - yesterday_up)
+        if delta > 1500:
+            corrections.append(f"剧烈波动日(delta={delta})")
+            # 降级：修改emotion的dim和pos_limit
+            dim = emotion.get('dim', '1.0')
+            if '2.0' in dim:
+                emotion['dim'] = '1.0'
+                emotion['pos_limit'] = min(emotion.get('pos_limit', 5), 5)
+            elif '3.0' in dim:
+                emotion['dim'] = '1.0'
+                emotion['pos_limit'] = min(emotion.get('pos_limit', 5), 5)
+    
+    # 校验2：缩量修正（盘前无成交额数据，跳过）
+    
+    # 校验3：极端值
+    if today_up > 4000 or today_up < 500:
+        corrections.append(f"极端值预警(涨跌{today_up})")
+        emotion['pos_limit'] = max(emotion.get('pos_limit', 5) // 2, 1)
+    
+    if corrections:
+        print(f"🔧 情绪三重校验: {'; '.join(corrections)}")
+    return emotion
+
+# ==================== 四维度选股 ====================
+
+def select_10_first_to_second(yesterday_zt):
+    """
+    1.0一进二：从昨日涨停池筛首板（昨日连板数=1）
+    排序：成交额越小越好（<8000万优先），板块涨停数越多越好
+    """
+    # 筛首板：昨日连板数=1
+    first_boards = []
+    for s in yesterday_zt:
+        lb = s.get('昨日连板数', 0)
+        try:
+            lb = int(lb)
+        except:
+            lb = 0
+        if lb != 1:
+            continue
+        
+        name = s.get('名称', '')
+        code = str(s.get('代码', ''))
+        sector = s.get('所属行业', '')
+        amount = s.get('成交额', 0)
+        try:
+            amount = float(amount)
+        except:
+            amount = 0
+        
+        amount_yi = amount / 1e8  # 转亿
+        
+        # 排除一字板（涨跌幅看不出来，但成交额极小的是）
+        if amount_yi < 0.1:
+            continue
+        
+        first_boards.append({
+            'name': name, 'code': code, 'sector': sector,
+            'amount': amount_yi, 'amount_raw': amount
+        })
+    
+    # 统计每个板块有多少只首板（板块强度）
+    sector_count = {}
+    for s in first_boards:
+        sec = s['sector']
+        sector_count[sec] = sector_count.get(sec, 0) + 1
+    
+    # 打分排序
+    for s in first_boards:
+        score = 0
+        score_detail = {}
+        # 额越小分越高
+        if s['amount'] <= 0.5:
+            as_ = 20
+            score += 20
+        elif s['amount'] <= 0.8:
+            as_ = 10
+            score += 10
+        else:
+            as_ = 0
+        score_detail['额得分'] = as_
+        # 板块有其他首板助攻
+        sc = sector_count.get(s['sector'], 0)
+        _ss = load_config().get('1.0_first_to_second', {}).get('score_sector', {})
+        if sc >= 3:
+            ss_ = _ss.get('ge_3', 15)
+            score += 15
+        elif sc >= 2:
+            ss_ = _ss.get('ge_2', 10)
+            score += 10
+        elif sc >= 1:
+            ss_ = _ss.get('ge_1', 5)
+            score += 5
+        else:
+            ss_ = 0
+        score_detail['板块强度得分'] = ss_
+        s['score'] = score
+        s['score_detail'] = score_detail
+    
+    # 催化剂评分（NEW）
+    if CATALYST_AVAILABLE:
+        for s in first_boards:
+            result = calculate_catalyst_score(s['sector'])
+            s['catalyst_score'] = result['score']
+            s['catalyst_grade'] = result['grade']
+            s['catalyst_action'] = get_catalyst_action(result['grade'])
+        # 按催化剂评分重新排序（S>A>B>C>D）
+        grade_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+        first_boards.sort(key=lambda x: (grade_order.get(x.get('catalyst_grade', 'D'), 4), -x['score'], x['amount']))
+    
+    else:
+        # 无催化剂评分，按原评分排序
+        first_boards.sort(key=lambda x: (-x['score'], x['amount']))
+    return first_boards[:5]
+
+def select_10_divergence(zt_sub, yesterday_zt):
+    """
+    1.0分歧低吸：2-3连板股，排除≥4板
+    从连板池+昨日涨停池的连板数筛选
+    """
+    candidates = []
+    
+    # 从昨日涨停池筛2-3板
+    for s in yesterday_zt:
+        lb = s.get('昨日连板数', 0)
+        try:
+            lb = int(lb)
+        except:
+            lb = 0
+        _div_cfg = load_config().get('1.0_divergence', {})
+        _min_lb = _div_cfg.get('min_lb', 2)
+        _max_lb = _div_cfg.get('max_lb', 3)
+        if lb < _min_lb or lb > _max_lb:
+            continue
+        
+        name = s.get('名称', '')
+        code = str(s.get('代码', ''))
+        sector = s.get('所属行业', '')
+        amount = s.get('成交额', 0)
+        try:
+            amount = float(amount)
+        except:
+            amount = 0
+        
+        candidates.append({
+            'name': name, 'code': code, 'lb': lb,
+            'sector': sector, 'amount': amount / 1e8,
+            'score': lb * 15,
+            'score_detail': {'连板得分': lb * 15, '板块强度得分': 0}
+        })
+    
+    # 按连板数×板块强度排序
+    sector_count = {}
+    for s in candidates:
+        sec = s['sector']
+        sector_count[sec] = sector_count.get(sec, 0) + 1
+    for s in candidates:
+        sc = sector_count.get(s['sector'], 0)
+        if sc >= 2:
+            s['score'] += 10
+            s['score_detail']['板块强度得分'] = 10
+    
+    # 催化剂评分（NEW）
+    if CATALYST_AVAILABLE:
+        for s in candidates:
+            result = calculate_catalyst_score(s['sector'])
+            s['catalyst_score'] = result['score']
+            s['catalyst_grade'] = result['grade']
+            s['catalyst_action'] = get_catalyst_action(result['grade'])
+        # 按催化剂等级排序
+        grade_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+        candidates.sort(key=lambda x: (grade_order.get(x.get('catalyst_grade', 'D'), 4), -x['score'], -x['lb']))
+    
+    else:
+        # 无催化剂评分，按原评分排序
+        candidates.sort(key=lambda x: (-x['score'], -x['lb']))
+    return candidates[:4]
+
+def select_20_sector(yesterday_zt):
+    """
+    2.0板块卡位：从昨日涨停池按板块统计涨停数，≥3家的板块取前排
+    前排 = 成交额最大的（资金认可度高）
+    """
+    sector_count = {}
+    sector_stocks = {}
+    
+    for s in yesterday_zt:
+        sector = s.get('所属行业', '')
+        if not sector:
+            continue
+        sector_count[sector] = sector_count.get(sector, 0) + 1
+        if sector not in sector_stocks:
+            sector_stocks[sector] = []
+        
+        name = s.get('名称', '')
+        code = str(s.get('代码', ''))
+        amount = s.get('成交额', 0)
+        try:
+            amount = float(amount)
+        except:
+            amount = 0
+        
+        sector_stocks[sector].append({
+            'name': name, 'code': code, 'amount': amount / 1e8,
+            'amount_raw': amount
+        })
+    
+    # 板块≥3家涨停
+    valid_sectors = sorted(
+        {k: v for k, v in sector_count.items() if v >= 3}.items(),
+        key=lambda x: -x[1]
+    )
+    
+    candidates = []
+    for sector, count in valid_sectors:
+        stocks = sector_stocks.get(sector, [])
+        stocks.sort(key=lambda x: x['amount_raw'], reverse=True)
+        for s in stocks[:2]:
+            s['sector'] = sector
+            s['sector_zt'] = count
+            s['score'] = count * 12 + min(s['amount'], 30)
+            s['score_detail'] = {'板块涨停得分': count * 12, '成交额得分': min(s['amount'], 30)}
+            
+            # 催化剂评分（NEW）
+            if CATALYST_AVAILABLE:
+                result = calculate_catalyst_score(sector)
+                s['catalyst_score'] = result['score']
+                s['catalyst_grade'] = result['grade']
+                s['catalyst_action'] = get_catalyst_action(result['grade'])
+            
+            candidates.append(s)
+    
+    # 按催化剂等级排序（S>A>B>C>D），同级按原评分
+    if CATALYST_AVAILABLE:
+        grade_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+        candidates.sort(key=lambda x: (grade_order.get(x.get('catalyst_grade', 'D'), 4), -x['score']))
+    else:
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+    
+    return candidates[:5]
+
+def select_30_trend(trend_pool, emotion):
+    """3.0趋势低吸：从趋势容量池选（C+B：辅助模式也生成候选，运行时动态解锁）"""
+    today_up = emotion.get('up_count', 0)
+    
+    # 读取3.0情绪规则
+    try:
+        _3e = load_config().get('3.0_emotion_rules', {})
+        _aux = _3e.get('辅助_mode', {})
+        allow_aux = _aux.get('allow_lowsuck', True)
+    except:
+        allow_aux = True
+    
+    # C+B：冰区且禁止低吸时才跳过
+    if today_up < 2000 and not allow_aux:
+        return []
+    
+    # 判定locked状态
+    dim = emotion.get('dim', '')
+    aux = emotion.get('aux', '')
+    is_aux_mode = (dim == '辅助' or aux == '无')
+    if is_aux_mode and today_up > 3500:
+        locked = True
+        locked_reason = '辅助模式·仅MA10低吸(≤1成)'
+    elif today_up < 2000:
+        locked = True
+        locked_reason = '冰点·3.0熔断'
+    else:
+        # 连续2日>2500才完全激活
+        state_file = Path(__file__).parent.parent / 'trading' / '系统状态.json'
+        yesterday_up = 0
+        if state_file.exists():
+            try:
+                with open(state_file) as f:
+                    state = json.load(f)
+                yesterday_up = state.get('yesterday', {}).get('up_count', 0)
+                if not yesterday_up:
+                    yesterday_up = state.get('today', {}).get('up_count', 0)
+            except:
+                pass
+        if yesterday_up > 2500 and today_up > 2500:
+            locked = False
+            locked_reason = ''
+        else:
+            locked = True
+            locked_reason = '等待连续2日>2500激活'
+    
+    candidates = []
+    for s in trend_pool:
+        code = s.get('code', '')
+        name = s.get('name', '')
+        amount_str = s.get('amount', '0')
+        try:
+            amount = float(amount_str)
+        except:
+            amount = 0
+        
+        # 从趋势池解析... v2.1字段映射
+        status = s.get('status', '')   # 🔴/🟡/🟢 赛道状态
+        note = s.get('note', '')       # 入池理由（含✅）
+        ma_ok = '✅' in note
+        
+        score = 0
+        if ma_ok:
+            score += 20
+        if '🔴' in status:
+            score += 30
+        elif '🟡' in status:
+            score += 20
+        _tc = load_config().get('3.0_trend', {})
+        if amount >= 10:
+            score += _tc.get('score_amount_ge_10', 15)
+        elif amount >= 5:
+            score += _tc.get('score_amount_ge_5', 10)
+        
+        # score_detail for 3.0
+        sd = {}
+        sd['均线得分'] = 20 if ma_ok else 0
+        sd['赛道状态得分'] = 30 if '🔴' in status else (20 if '🟡' in status else 0)
+        sd['成交额得分'] = _tc.get('score_amount_ge_10', 15) if amount >= 10 else (_tc.get('score_amount_ge_5', 10) if amount >= 5 else 0)
+        
+        candidates.append({
+            'name': name, 'code': code,
+            'logic': f"{s.get('track', '')}/{status}",
+            'amount': amount,
+            'note': f'均线{"多头" if ma_ok else "待验证"}+额{amount}亿',
+            'score': score,
+            'score_detail': sd,
+            'locked': locked,
+            'locked_reason': locked_reason
+        })
+    
+    # 催化剂评分（NEW）
+    if CATALYST_AVAILABLE:
+        for c in candidates:
+            track = c.get('logic', '').split('/')[0]  # 从 "赛道/状态" 取赛道名
+            result = calculate_catalyst_score(track if track else c.get('name', ''))
+            c['catalyst_score'] = result['score']
+            c['catalyst_grade'] = result['grade']
+            c['catalyst_action'] = get_catalyst_action(result['grade'])
+    
+    # 按催化剂等级排序
+    if CATALYST_AVAILABLE:
+        grade_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
+        candidates.sort(key=lambda x: (grade_order.get(x.get('catalyst_grade', 'D'), 4), -x['score']))
+    else:
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+    
+    # 从config读取min_score和top_n
+    try:
+        import json as _json
+        with open(os.path.join(os.path.dirname(__file__), '..', 'lobster-config.json')) as _f:
+            _cfg = _json.load(_f)
+        min_score = _cfg.get('trend_pool', {}).get('hard_constraints', {}).get('min_score', 30)
+        top_n = _cfg.get('3.0_trend', {}).get('top_n', 3)
+    except:
+        min_score, top_n = 30, 3
+
+    candidates = [c for c in candidates if c['score'] >= min_score]
+    candidates.sort(key=lambda x: x['score'], reverse=True)
+    return candidates[:top_n]
+
+# ==================== 主流程 ====================
+
+def main():
+    today = datetime.date.today().strftime('%Y-%m-%d')
+    
+    print(f"🦞 龙虾盘前选股引擎 v1.0 | {today}")
+    
+    # 1. 数据
+    print("📥 获取市场数据...")
+    indices = get_index()
+    sh = indices.get('sh000001', {}).get('change', 0)
+    sz = indices.get('sz399001', {}).get('change', 0)
+    cy = indices.get('sz399006', {}).get('change', 0)
+    print(f"  指数: 上证{sh}% 深证{sz}% 创业板{cy}%")
+    
+    ad = get_advance_decline()
+    if not ad:
+        print("❌ 涨跌家数获取失败，退出")
+        sys.exit(1)
+    print(f"  涨跌: {ad['up']}涨/{ad['down']}跌 {ad.get('zt', '?')}涨停/{ad.get('dt', '?')}跌停")
+    
+    # 2. 情绪
+    emotion = determine_emotion(ad)
+    emotion['up_count'] = ad['up']  # 传给select_30_trend用于激活判断
+    
+    # 情绪三重校验（v2.5）
+    state_path = Path(__file__).resolve().parent.parent / "trading" / "系统状态.json"
+    yesterday_up = None
+    try:
+        with open(state_path) as sf:
+            state = json.load(sf)
+        yesterday_up = state.get('yesterday', {}).get('up_count')
+    except:
+        pass
+    emotion = emotion_triple_check_premarket(emotion, yesterday_up)
+    
+    print(f"📊 情绪: {ad['up']}家 → 主导{emotion['dim']} 辅助{emotion.get('aux','')} 仓位上限{emotion['pos_limit']}成")
+    
+    # 3. 涨停数据
+    print("📥 获取涨停数据...")
+    yesterday_zt, yest_date = get_yesterday_zt()
+    zt_sub = get_zt_sub()
+    print(f"  昨日涨停池: {len(yesterday_zt)}只({yest_date}) 连板池: {len(zt_sub)}只")
+    
+    # 4. 选股
+    print("🔍 选股中...")
+    c1_first = select_10_first_to_second(yesterday_zt)
+    c1_div = select_10_divergence(zt_sub, yesterday_zt)
+    c2_sector = select_20_sector(yesterday_zt)
+    trend_pool = get_trend_pool()
+    c3_trend = select_30_trend(trend_pool, emotion)
+    
+    # 5. 输出JSON
+    result = {
+        'date': today,
+        'version': 'v1.3-config-driven',
+        'indices': {'上证': sh, '深证': sz, '创业板': cy},
+        'emotion': {
+            '上涨家数': ad['up'],
+            '下跌家数': ad['down'],
+            '涨停': ad.get('zt', 0),
+            '跌停': ad.get('dt', 0),
+            '主导维度': emotion['dim'],
+            '辅助维度': emotion['aux'],
+            '总仓位上限': emotion['pos_limit']
+        },
+        'candidates': {
+            '1.0一进二': [
+                {'名称': s['name'], '代码': s['code'], '额': s['amount'],
+                 '催化剂': s.get('catalyst_grade', '?'),
+                 '建议': s.get('catalyst_action', ''),
+                 '备注': f"额{s['amount']}亿+{s['sector']}",
+                 'score_detail': s.get('score_detail', {})}
+                for s in c1_first
+            ],
+            '1.0分歧低吸': [
+                {'名称': s['name'], '代码': s['code'], '连板': s['lb'],
+                 '催化剂': s.get('catalyst_grade', '?'),
+                 '建议': s.get('catalyst_action', ''),
+                 '备注': f"{s['lb']}连板+{s['sector']}",
+                 'score_detail': s.get('score_detail', {})}
+                for s in c1_div
+            ],
+            '2.0板块卡位': [
+                {'名称': s['name'], '代码': s['code'], '板块': s['sector'],
+                 '额': s['amount'],
+                 '催化剂': s.get('catalyst_grade', '?'),
+                 '建议': s.get('catalyst_action', ''),
+                 '备注': f"{s['sector']}({s['sector_zt']}家涨停)",
+                 'score_detail': s.get('score_detail', {})}
+                for s in c2_sector
+            ],
+            '3.0趋势低吸': [
+                {'名称': s['name'], '代码': s['code'], '产业逻辑': s['logic'],
+                 '额': s['amount'],
+                 '催化剂': s.get('catalyst_grade', '?'),
+                 '建议': s.get('catalyst_action', ''),
+                 '备注': s['note'],
+                 'score_detail': s.get('score_detail', {}),
+                 'locked': s.get('locked', False),
+                 '锁定原因': s.get('locked_reason', '') if s.get('locked') else ''}
+                for s in c3_trend
+            ]
+        }
+    }
+    
+    # 修复备注里的板块统计
+    # 1.0一进二的板块涨停数
+    sector_count = {}
+    for s in c1_first:
+        sector_count[s['sector']] = sector_count.get(s['sector'], 0) + 1
+    for c in result['candidates']['1.0一进二']:
+        for s in c1_first:
+            if s['code'] == c['代码']:
+                c['备注'] = f"额{s['amount']}亿+{s['sector']}({sector_count.get(s['sector'],0)}家首板)"
+                break
+    
+    out_path = '/tmp/lobster_premarket_candidates.json'
+    with open(out_path, 'w') as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"✅ 已写入 {out_path}")
+    
+    # 6. 打印结果
+    print(f"\n{'='*60}")
+    print(f"✅ 龙虾盘前选股 {today}")
+    print(f"- 情绪：{ad['up']}涨/{ad['down']}跌，{ad.get('zt',0)}涨停/{ad.get('dt',0)}跌停")
+    print(f"- 主导维度：{emotion['dim']}，辅助维度：{emotion['aux']}")
+    print(f"- 总仓位上限：{emotion['pos_limit']}成")
+    
+    for tier_name, stocks in result['candidates'].items():
+        print(f"\n【{tier_name}】（{len(stocks)}只）")
+        if not stocks:
+            print("  无符合条件的标的")
+        for i, s in enumerate(stocks, 1):
+            if tier_name == '1.0一进二':
+                print(f"  {i}. {s['名称']}({s['代码']}) — {s['备注']}")
+            elif tier_name == '1.0分歧低吸':
+                print(f"  {i}. {s['名称']}({s['代码']}) — {s['备注']}")
+            elif tier_name == '2.0板块卡位':
+                print(f"  {i}. {s['名称']}({s['代码']}) — {s['备注']} 额{s['额']}亿")
+            else:
+                print(f"  {i}. {s['名称']}({s['代码']}) — {s['备注']}")
+    
+    print(f"\n📌 以上为候选池，09:25竞价阶段将从中筛选最优1只/档位")
+
+if __name__ == '__main__':
+    main()

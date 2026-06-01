@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🦞 龙虾超短交易系统 · 知识图谱 v2.4</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --dim1: #f97316;
+    --dim2: #3b82f6;
+    --dim3: #22c55e;
+    --alert: #ef4444;
+    --warn: #eab308;
+    --accent: #a78bfa;
+    --dim1-bg: rgba(249,115,22,0.12);
+    --dim2-bg: rgba(59,130,246,0.12);
+    --dim3-bg: rgba(34,197,94,0.12);
+    --alert-bg: rgba(239,68,68,0.12);
+    --warn-bg: rgba(234,179,8,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .header .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    flex: 1;
+  }
+  .version-badge {
+    background: var(--dim1-bg);
+    border: 1px solid var(--dim1);
+    color: var(--dim1);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ===== NAV ===== */
+  .nav {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+  }
+  .nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .nav a:hover, .nav a.active {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  /* ===== MAIN ===== */
+  .main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 32px;
+  }
+
+  /* ===== SECTION ===== */
+  .section {
+    display: none;
+  }
+  .section.active { display: block; }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ===== GRID ===== */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  /* ===== CARD ===== */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  /* ===== DIMENSION CARDS ===== */
+  .dim-card {
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid;
+    position: relative;
+    overflow: hidden;
+  }
+  .dim-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+  }
+  .dim-card.dim1 { background: var(--dim1-bg); border-color: var(--dim1); }
+  .dim-card.dim1::before { background: var(--dim1); }
+  .dim-card.dim2 { background: var(--dim2-bg); border-color: var(--dim2); }
+  .dim-card.dim2::before { background: var(--dim2); }
+  .dim-card.dim3 { background: var(--dim3-bg); border-color: var(--dim3); }
+  .dim-card.dim3::before { background: var(--dim3); }
+
+  .dim-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .dim-num {
+    font-size: 28px;
+    font-weight: 900;
+  }
+  .dim1 .dim-num { color: var(--dim1); }
+  .dim2 .dim-num { color: var(--dim2); }
+  .dim3 .dim-num { color: var(--dim3); }
+  .dim-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .dim-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .dim-desc {
+    font-size: 13px;
+    color: var(--text);
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+  }
+
+  /* ===== TABLE ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  th {
+    text-align: left;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  td {
+    padding: 7px 8px;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ===== TAG ===== */
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-red { background: var(--alert-bg); color: var(--alert); border: 1px solid var(--alert); }
+  .tag-yellow { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+  .tag-green { background: var(--dim3-bg); color: var(--dim3); border: 1px solid var(--dim3); }
+  .tag-blue { background: var(--dim2-bg); color: var(--dim2); border: 1px solid var(--dim2); }
+  .tag-orange { background: var(--dim1-bg); color: var(--dim1); border: 1px solid var(--dim1); }
+  .tag-purple { background: rgba(167,139,250,0.12); color: var(--accent); border: 1px solid var(--accent); }
+
+  /* ===== FLOW ===== */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .flow-node {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: var(--text-muted);
+    font-size: 18px;
+    font-weight: 300;
+  }
+
+  /* ===== SCORE TABLE ===== */
+  .score-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+  }
+  .score-item:last-child { border-bottom: none; }
+  .score-label { font-size: 13px; color: var(--text); }
+  .score-w { font-size: 11px; color: var(--text-muted); }
+  .score-bar-wrap {
+    flex: 1;
+    margin: 0 12px;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar { height: 100%; border-radius: 3px; }
+  .score-val { font-size: 12px; font-weight: 700; min-width: 50px; text-align: right; }
+
+  /* ===== ALERT BOX ===== */
+  .alert-box {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-size: 13px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-box.alert { background: var(--alert-bg); border: 1px solid var(--alert); color: var(--alert); }
+  .alert-box.warn { background: var(--warn-bg); border: 1px solid var(--warn); color: var(--warn); }
+  .alert-box.info { background: rgba(59,130,246,0.1); border: 1px solid var(--dim2); color: var(--dim2); }
+  .alert-box.success { background: var(--dim3-bg); border: 1px solid var(--dim3); color: var(--dim3); }
+
+  /* ===== MATRIX ===== */
+  .matrix-wrap { overflow-x: auto; }
+  .matrix {
+    display: grid;
+    gap: 2px;
+    font-size: 12px;
+    min-width: 400px;
+  }
+  .matrix .th { background: rgba(48,54,61,0.8); color: var(--text-muted); text-align: center; padding: 8px; font-size: 11px; }
+  .matrix .cell { padding: 10px 12px; text-align: center; border-radius: 6px; }
+  .matrix .row-h { background: rgba(48,54,61,0.4); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 11px; }
+
+  /* ===== TRACK ===== */
+  .track-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+    font-size: 13px;
+  }
+  .track-item:last-child { border-bottom: none; }
+  .track-name { font-weight: 600; color: #fff; }
+  .track-status { font-size: 11px; }
+
+  /* ===== TIMELINE ===== */
+  .timeline { position: relative; padding-left: 24px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .tl-item {
+    position: relative;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -20px; top: 14px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 2px solid var(--dim2);
+    background: var(--bg);
+  }
+  .tl-time { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .tl-title { font-size: 13px; font-weight: 600; color: #fff; }
+
+  /* ===== GRAPH SVG ===== */
+  .graph-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 16px;
+    overflow: hidden;
+  }
+  .graph-container svg { width: 100%; }
+
+  /* ===== FLEX UTILS ===== */
+  .flex { display: flex; }
+  .flex-col { display: flex; flex-direction: column; }
+  .gap8 { gap: 8px; }
+  .gap12 { gap: 12px; }
+  .mt8 { margin-top: 8px; }
+  .mt12 { margin-top: 12px; }
+  .mt16 { margin-top: 16px; }
+  .mb8 { margin-bottom: 8px; }
+  .mb12 { margin-bottom: 12px; }
+  .text-muted { color: var(--text-muted); font-size: 12px; }
+  .text-center { text-align: center; }
+  .font-mono { font-family: 'Courier New', monospace; font-size: 12px; }
+  .rule-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .rule-check { color: var(--dim3); font-weight: 700; flex-shrink: 0; }
+  .rule-x { color: var(--alert); font-weight: 700; flex-shrink: 0; }
+
+  .rule-list { list-style: none; }
+  .rule-list li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(48,54,61,0.3);
+    font-size: 13px;
+  }
+  .rule-list li:last-child { border-bottom: none; }
+
+  .separator {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+
+  .rule-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .node {
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+  .node:hover { filter: brightness(1.2); }
+
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .header { padding: 16px; }
+  }
+
+  .tab-nav {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    gap: 0;
+  }
+  .tab-btn {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--dim2); border-bottom-color: var(--dim2); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <span style="font-size:28px;">🦞</span>
+  <h1>龙虾超短交易系统 · 知识图谱</h1>
+  <div class="subtitle">龙虾超短交易系统 · 三维度框架 · 选股复盘规则进化全览</div>
+  <span class="version-badge">v2.4 · 2026-05-20</span>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <a class="active" onclick="showSection('sec-overview')">📐 总览</a>
+  <a onclick="showSection('sec-emotion')">🌡️ 情绪周期</a>
+  <a onclick="showSection('sec-dim1')">🔥 1.0 点</a>
+  <a onclick="showSection('sec-dim2')">🌊 2.0 线</a>
+  <a onclick="showSection('sec-dim3')">📈 3.0 面</a>
+  <a onclick="showSection('sec-position')">⚖️ 仓位矩阵</a>
+  <a onclick="showSection('sec-stop')">🛡️ 止损体系</a>
+  <a onclick="showSection('sec-evolution')">🔄 进化机制</a>
+  <a onclick="showSection('sec-industry')">🏭 产业图谱</a>
+  <a onclick="showSection('sec-graph')">🕸️ 关系图谱</a>
+  <a onclick="showSection('sec-rules')">📋 审计清单</a>
+</div>
+
+<div class="main">
+
+<!-- ============ SECTION: OVERVIEW ============ -->
+<div class="section active" id="sec-overview">
+  <div class="section-title">📐 系统总览 · 三维度框架</div>
+
+  <div class="alert-box success mb12">
+    <span>✅</span>
+    <div>
+      <strong>核心范式转变</strong>：龙虾系统从需求侧（预期/空间）转向<strong>供给侧</strong>（产能锁定·交付确定性），估值窗口10-30年。复盘不是总结，是进化触发。
+    </div>
+  </div>
+
+  <div class="grid-3 mt16">
+    <!-- DIM 1 -->
+    <div class="dim-card dim1">
+      <div class="dim-header">
+        <span class="dim-num">1.0</span>
+        <div>
+          <div class="dim-name">点 · 打板</div>
+          <div class="dim-subtitle">情绪 &lt;1500 主导</div>
+        </div>
+      </div>
+      <div class="dim-desc">
+        一进二 + 分歧低吸<br>
+        核心逻辑：连板股溢价最强日，次日情绪反弹捕获二板
+      </div>
+      <table>
+        <tr><td class="text-muted">操作类型</td><td>连板次日涨停</td></tr>
+        <tr><td class="text-muted">持仓周期</td><td>T+1 超短</td></tr>
+        <tr><td class="text-muted">仓位体系</td><td><span class="tag tag-orange">体系A · 固定3成</span></td></tr>
+        <tr><td class="text-muted">止损</td><td>买入-5% / 3日未板</td></tr>
+        <tr><td class="text-muted">入选阈值</td><td>打分 ≥60分</td></tr>
+      </table>
+    </div>
+
+    <!-- DIM 2 -->
+    <div class="dim-card dim2">
+      <div class="dim-header">
+        <span class="dim-num">2.0</span>
+        <div>
+          <div class="dim-name">线 · 板块轮动</div>
+          <div class="dim-subtitle">情绪 2500-3500 主导</div>
+        </div>
+      </div>
+      <div class="dim-desc">
+        板块卡位 + 高低切<br>
+        核心逻辑：主线板块内部轮动，从龙头切后排补涨
+      </div>
+      <table>
+        <tr><td class="text-muted">操作类型</td><td>板块内前排涨停</td></tr>
+        <tr><td class="text-muted">持仓周期</td><td>T+2~T+3 短线</td></tr>
+        <tr><td class="text-muted">仓位体系</td><td><span class="tag tag-orange">体系A · 固定3成</span></td></tr>
+        <tr><td class="text-muted">止损</td><td>买入-7% / 板块跌>3%</td></tr>
+        <tr><td class="text-muted">入选阈值</td><td>打分 ≥70分</td></tr>
+      </table>
+    </div>
+
+    <!-- DIM 3 -->
+    <div class="dim-card dim3">
+      <div class="dim-header">
+        <span class="dim-num">3.0</span>
+        <div>
+          <div class="dim-name">面 · 容量趋势</div>
+          <div class="dim-subtitle">情绪 1500-2500 辅助</div>
+        </div>
+      </div>
+      <div class="dim-desc">
+        产业逻辑 + 趋势低吸<br>
+        核心逻辑：供给侧产能锁定，中线趋势持股，吃产业兑现
+      </div>
+      <table>
+        <tr><td class="text-muted">操作类型</td><td>回踩均线低吸</td></tr>
+        <tr><td class="text-muted">持仓周期</td><td>Tier-1≥5日 / Tier-2≥3日</td></tr>
+        <tr><td class="text-muted">仓位体系</td><td><span class="tag tag-green">体系B · L1×L2矩阵</span></td></tr>
+        <tr><td class="text-muted">止损</td><td>MA5&lt;MA10 / 催化落空</td></tr>
+        <tr><td class="text-muted">入选阈值</td><td>打分 ≥30分</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Dimension Flow -->
+  <div class="section-title">🔀 维度切换总图（情绪驱动）</div>
+  <div class="card">
+    <div class="flow">
+      <div class="flow-node" style="background:var(--alert-bg);border-color:var(--alert);color:var(--alert)">🧊 &lt;1500<br><span style="font-size:11px">极度冰点</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--dim1);color:var(--dim1)">1.0主导<br><span style="font-size:11px">仓位≤5成</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:var(--warn-bg);border-color:var(--warn);color:var(--warn)">📉 1500-2500<br><span style="font-size:11px">修复期</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--dim3);color:var(--dim3)">1.0+3.0<br><span style="font-size:11px">总仓≤9成</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:var(--dim2-bg);border-color:var(--dim2);color:var(--dim2)">📈 2500-3500<br><span style="font-size:11px">高潮期</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--dim2);color:var(--dim2)">2.0+1.0<br><span style="font-size:11px">总仓≤7成</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="background:var(--alert-bg);border-color:var(--alert);color:var(--alert)">🔴 &gt;3500<br><span style="font-size:11px">极度高潮</span></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="color:var(--text-muted)">辅助模式<br><span style="font-size:11px">总仓≤2成</span></div>
+    </div>
+    <div class="alert-box warn mt12">
+      <span>⚠️</span>
+      <div>情绪边界模糊（阈值±50范围），以保守为准处理。例：1480 → 按&lt;1500冰点处理。</div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Data Sources -->
+  <div class="section-title">🗄️ 数据源优先级</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">✅ 正确数据源</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">→</span><strong>实时涨跌</strong> → 腾讯 qt.gtimg.cn（GB2312编码）</li>
+        <li><span class="rule-check">→</span><strong>涨跌家数</strong> → legulegu.com（实时更新）</li>
+        <li><span class="rule-check">→</span><strong>历史K线/均线</strong> → akshare stock_zh_a_hist</li>
+        <li><span class="rule-check">→</span><strong>今日涨停池</strong> → Playwright 东财ztb（如有延迟用akshare）</li>
+        <li><span class="rule-check">→</span><strong>板块涨跌</strong> → 腾讯 qt.gtimg.cn（实时）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">❌ 错误来源警示</div>
+      <ul class="rule-list">
+        <li><span class="rule-x">✗</span><strong>akshare K线</strong> — 延迟到前一交易日，实时涨跌全部错误</li>
+        <li><span class="rule-x">✗</span><strong>预测性表述</strong> — "大概率/必然/应该会" 零容忍</li>
+        <li><span class="rule-x">✗</span><strong>AI自由裁量</strong> — 选股必须走Python打分脚本</li>
+        <li><span class="rule-x">✗</span><strong>T+0</strong> — 当日买当日卖，违反交易制度</li>
+        <li><span class="rule-x">✗</span><strong>放宽条件</strong> — 模式条件不可变通</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: EMOTION ============ -->
+<div class="section" id="sec-emotion">
+  <div class="section-title">🌡️ 情绪周期判定</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📊 情绪周期对照表</div>
+      <table>
+        <tr><th>涨跌家数</th><th>周期</th><th>主导</th><th>辅助</th><th>总仓上限</th></tr>
+        <tr>
+          <td><span class="tag tag-red">&lt;1500</span></td>
+          <td>🧊 极度冰点</td>
+          <td><span class="tag tag-orange">1.0</span></td>
+          <td>—</td>
+          <td><strong style="color:var(--alert)">5成</strong></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-yellow">1500-2000</span></td>
+          <td>❄️ 冰点修复期</td>
+          <td><span class="tag tag-orange">1.0</span></td>
+          <td>3.0休眠</td>
+          <td><strong>5成</strong></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-yellow">2000-2500</span></td>
+          <td>📉 修复期</td>
+          <td><span class="tag tag-orange">1.0</span></td>
+          <td><span class="tag tag-green">3.0预备</span></td>
+          <td><strong>9成</strong></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-blue">2500-3500</span></td>
+          <td>📈 高潮期</td>
+          <td><span class="tag tag-blue">2.0</span></td>
+          <td><span class="tag tag-orange">1.0</span></td>
+          <td><strong>7成</strong></td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-red">&gt;3500</span></td>
+          <td>🔴 极度高潮</td>
+          <td>辅助模式</td>
+          <td>—</td>
+          <td><strong style="color:var(--alert)">2成</strong></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔬 3.0 冰点熔断与修复确认（v2.4统一）</div>
+      <div class="timeline mt8">
+        <div class="tl-item">
+          <div class="tl-time">阶段 1</div>
+          <div class="tl-title"><span class="tag tag-red">🔴 冰点</span> 涨跌家数 &lt;1500</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">→ 1.0主导，3.0强制休眠</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">阶段 2</div>
+          <div class="tl-title"><span class="tag tag-yellow">🧊 冰点持续</span> 涨跌家数 &lt;2000</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">→ 3.0继续休眠，连续2日&lt;1700 = 3.0强制移出</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">阶段 3</div>
+          <div class="tl-title"><span class="tag tag-yellow">📉 修复确认</span> 连续2日 &gt;1700</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">→ 3.0预备激活（次日观察）<br>⚠️ 避免假修复（单日回升≠确认）</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-time">阶段 4</div>
+          <div class="tl-title"><span class="tag tag-green">✅ 激活</span> 连续2日 &gt;2500</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">→ 3.0正式激活，开始趋势低吸</div>
+        </div>
+      </div>
+      <div class="alert-box warn mt12">
+        <span>⚠️</span>
+        <div>修复确认阈值<strong>从1500上调至1700</strong>（避免假修复，v2.4量化）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Emergency Alerts -->
+  <div class="section-title">🚨 紧急告警体系</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">告警条件与动作</div>
+      <table>
+        <tr><th>条件</th><th>等级</th><th>动作</th></tr>
+        <tr><td>涨跌家数&lt;1500</td><td><span class="tag tag-red">🚨 冰点</span></td><td>主导→1.0，仓≤5成</td></tr>
+        <tr><td>涨跌家数&gt;3500</td><td><span class="tag tag-red">🔴 极度高潮</span></td><td>辅助模式，仓≤2成</td></tr>
+        <tr><td>炸板率&gt;35%</td><td><span class="tag tag-yellow">⚠️</span></td><td>降仓，不追板</td></tr>
+        <tr><td>涨跌家数连3日&lt;1500</td><td><span class="tag tag-red">🧊 持续冰点</span></td><td>空仓观望</td></tr>
+        <tr><td>连板股集体断档</td><td><span class="tag tag-yellow">⚠️</span></td><td>警告风格切换</td></tr>
+        <tr><td>趋势池标的破MA10</td><td><span class="tag tag-yellow">📉</span></td><td>移出趋势池</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">告警去重机制</div>
+      <ul class="rule-list mt8">
+        <li><span class="rule-check">→</span>同类型告警同日仅发送一次</li>
+        <li><span class="rule-check">→</span>通过 <code class="font-mono">trading-state.json</code> 记录</li>
+        <li><span class="rule-check">→</span>判定依据：<code class="font-mono">state.lastAlert.type</code> + <code class="font-mono">state.lastAlert.time</code></li>
+        <li><span class="rule-check">→</span>状态文件避免重复发送同类告警</li>
+      </ul>
+      <div class="alert-box alert mt12">
+        <span>🚨</span>
+        <div>告警是提醒，不是指令。仓位调整最终由你决定。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: DIM1 ============ -->
+<div class="section" id="sec-dim1">
+  <div class="section-title">🔥 1.0 维度 · 点（打板）</div>
+
+  <div class="grid-2">
+    <!-- 一进二 -->
+    <div class="card">
+      <div class="card-title">🎯 一进二 · 信号条件</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">必须全部满足方可纳入打分池</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">✓</span>昨日首板涨停</li>
+        <li><span class="rule-check">✓</span>昨日换手率 &gt;5%</li>
+        <li><span class="rule-check">✓</span>量比 &gt;1.5</li>
+        <li><span class="rule-check">✓</span>竞量 ≥15%</li>
+        <li><span class="rule-check">✓</span>高开 6-10%</li>
+        <li><span class="rule-check">✓</span>首板额 ≤8000万</li>
+        <li><span class="rule-check">✓</span>换手实体板（非一字板）</li>
+        <li><span class="rule-x">✗</span>排除：庄股（成交额分布不均匀）</li>
+      </ul>
+    </div>
+
+    <!-- 分歧低吸 -->
+    <div class="card">
+      <div class="card-title">💧 分歧低吸 · 信号条件</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">昨日涨停今日分歧，缩量低吸</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">✓</span>昨日涨停今日低开/下杀</li>
+        <li><span class="rule-check">✓</span>未破关键支撑（MA5/MA10）</li>
+        <li><span class="rule-check">✓</span>分时缩量</li>
+        <li><span class="rule-check">✓</span>连板数 &lt;4（≥4板高标移出低吸池）</li>
+        <li><span class="rule-x">✗</span>蒙娜丽莎6板低吸跌停教训（2026-05-18）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- 1.0 Scorings -->
+  <div class="card-title mb8">📊 一进二打分模型（满分100 · 入选≥60分）</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">一进二打分指标</div>
+      <div class="score-item">
+        <div><div class="score-label">竞量比</div><div class="score-w">权重 30%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">≥20%=30分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">高开幅度</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">6-10%=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">首板成交额</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">≤5000万=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">板块强度</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">≥5家=15分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">换手实体板</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">是=15分</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">分歧低吸打分指标</div>
+      <div class="score-item">
+        <div><div class="score-label">连板高度</div><div class="score-w">权重 30%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">3板+=30分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">低开幅度</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">-3%~-1%=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">成交额衰减</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">≤30%=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">板块延续</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">≥3家=15分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">均线支撑</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim1)"></div></div>
+        <div class="score-val" style="color:var(--dim1)">站MA5=15分</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: DIM2 ============ -->
+<div class="section" id="sec-dim2">
+  <div class="section-title">🌊 2.0 维度 · 线（板块轮动）</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">🎯 板块卡位 · 信号条件</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">板块内部轮动，高低切换</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">✓</span><strong>板块涨停确认</strong>（二选一）：</li>
+        <li style="padding-left:20px;font-size:12px">上午确认：11:30前 ≥2家涨停封死 + 板块涨幅&gt;2%</li>
+        <li style="padding-left:20px;font-size:12px">全天确认：全天 ≥3家涨停 且 封板时间&gt;30分钟</li>
+        <li><span class="rule-check">✓</span>个股为前排（率先涨停/封单最强）</li>
+        <li><span class="rule-check">✓</span>成交额 ≥5000万</li>
+        <li><span class="rule-x">✗</span>排除尾盘偷鸡：14:50后涨停不计入</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔀 高低切 · 触发条件</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">✓</span>前排已高（≥3板）</li>
+        <li><span class="rule-check">✓</span>后排补涨启动（首板/二板）</li>
+      </ul>
+      <div class="alert-box warn mt12">
+        <span>⚠️</span>
+        <div>板块确认是2.0的硬约束。板块涨停&lt;3家直接排除，不打分。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">📊 2.0 板块卡位打分模型（满分100 · 入选≥70分）</div>
+  <div class="card">
+    <div class="score-item">
+      <div><div class="score-label">板块涨停家数</div><div class="score-w">权重 40%（硬约束）</div></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--dim2)"></div></div>
+      <div class="score-val" style="color:var(--dim2)">≥5家=40分 · &lt;3家=0分直接排除</div>
+    </div>
+    <div class="score-item">
+      <div><div class="score-label">前排股成交额</div><div class="score-w">权重 30%</div></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--dim2)"></div></div>
+      <div class="score-val" style="color:var(--dim2)">≥5亿=30分</div>
+    </div>
+    <div class="score-item">
+      <div><div class="score-label">板块地位</div><div class="score-w">权重 20%</div></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim2)"></div></div>
+      <div class="score-val" style="color:var(--dim2)">龙头=20分 / 前排=15分</div>
+    </div>
+    <div class="score-item">
+      <div><div class="score-label">分时强度</div><div class="score-w">权重 10%</div></div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:33%;background:var(--dim2)"></div></div>
+      <div class="score-val" style="color:var(--dim2)">竞价高开≥5%=10分</div>
+    </div>
+    <div class="alert-box alert mt8">
+      <span>🚨</span>
+      <div><strong>硬约束</strong>：板块涨停&lt;3家 → 0分直接排除，不进入打分流程。排序只取前1名（最强板块）。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: DIM3 ============ -->
+<div class="section" id="sec-dim3">
+  <div class="section-title">📈 3.0 维度 · 面（容量趋势）</div>
+
+  <div class="alert-box success mb12">
+    <span>✅</span>
+    <div><strong>3.0核心逻辑</strong>：供给侧产能锁定，中线趋势持股。必须在产业逻辑框架.md中有记录才能入池。成交额≥5亿（非小票）。</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">🎯 趋势低吸 · 入池条件</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">✓</span>产业逻辑支撑（在产业逻辑框架.md中）</li>
+        <li><span class="rule-check">✓</span>成交额 ≥5亿</li>
+        <li><span class="rule-check">✓</span>MA5 &gt; MA10（完整多头排列）</li>
+        <li><span class="rule-check">✓</span>回踩 MA5 不破</li>
+        <li><span class="rule-x">✗</span>赛道为🟢早期/L4 → 不入池（观察级）</li>
+        <li><span class="rule-x">✗</span>赛道为🔴一致性高潮边缘 → 不追</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📤 趋势池退出机制（v2.2量化）</div>
+      <table>
+        <tr><th>触发条件</th><th>等级</th><th>动作</th></tr>
+        <tr><td>连续2日打分&lt;4项</td><td><span class="tag tag-red">🔴预警</span></td><td>入观察区</td></tr>
+        <tr><td>赛道🔴→🟢</td><td><span class="tag tag-red">🔴预警</span></td><td>立即入观察区</td></tr>
+        <tr><td>赛道🔴→🟡</td><td><span class="tag tag-yellow">🟡降级</span></td><td>保留，仓≤1成</td></tr>
+        <tr><td>板块地位跌出前10</td><td><span class="tag tag-red">🔴预警</span></td><td>入观察区</td></tr>
+        <tr><td>连续5日打分&lt;4项</td><td><span class="tag tag-red">⚠️确认</span></td><td>强制移出</td></tr>
+        <tr><td>MA5&lt;MA10 且3日不收回</td><td><span class="tag tag-red">🔴强制</span></td><td>立即移出</td></tr>
+        <tr><td>涨跌家数连2日&lt;2000</td><td><span class="tag tag-red">🔴强制</span></td><td>3.0休眠移出</td></tr>
+        <tr><td>政策逆转/技术颠覆</td><td><span class="tag tag-red">🔴强制</span></td><td>立即移出</td></tr>
+      </table>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:8px">观察区冷静期 ≤30日，超期自动移出</div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">📊 3.0 趋势低吸打分模型（满分100 · 入选≥30分）</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="score-item">
+        <div><div class="score-label">产业逻辑强度</div><div class="score-w">权重 30%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:100%;background:var(--dim3)"></div></div>
+        <div class="score-val" style="color:var(--dim3)">L1🔴=30分 / L2🟡=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">均线排列</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim3)"></div></div>
+        <div class="score-val" style="color:var(--dim3)">MA5&gt;MA10&gt;MA20=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">回踩位置</div><div class="score-w">权重 20%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:66%;background:var(--dim3)"></div></div>
+        <div class="score-val" style="color:var(--dim3)">回踩MA5=20分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">成交额</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim3)"></div></div>
+        <div class="score-val" style="color:var(--dim3)">≥10亿=15分 · &lt;3亿=0分</div>
+      </div>
+      <div class="score-item">
+        <div><div class="score-label">涨跌家数环境</div><div class="score-w">权重 15%</div></div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:50%;background:var(--dim3)"></div></div>
+        <div class="score-val" style="color:var(--dim3)">连2日&gt;2500=15分</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔑 持有期硬约束（v2.3新增）</div>
+      <table>
+        <tr><th>Tier</th><th>最低持有</th><th>提前退出条件</th></tr>
+        <tr><td><span class="tag tag-green">Tier-1</span></td><td><strong>≥5日</strong></td><td>仅逻辑证伪可退出</td></tr>
+        <tr><td><span class="tag tag-yellow">Tier-2</span></td><td><strong>≥3日</strong></td><td>仅逻辑证伪可退出</td></tr>
+      </table>
+      <div class="alert-box alert mt12">
+        <span>🚨</span>
+        <div><strong>例外</strong>：逻辑破坏/催化落空 → 立即清仓，不受持有期限制。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: POSITION ============ -->
+<div class="section" id="sec-position">
+  <div class="section-title">⚖️ 仓位管理体系</div>
+
+  <div class="grid-2 mb12">
+    <div class="card">
+      <div class="card-title">体系A · 1.0 / 2.0 维度</div>
+      <div style="font-size:13px;margin-bottom:12px">固定3成仓位，纪律优先</div>
+      <table>
+        <tr><th>情绪区间</th><th>主导</th><th>总仓上限</th><th>说明</th></tr>
+        <tr><td>&lt;1500</td><td><span class="tag tag-orange">1.0</span></td><td><strong style="color:var(--alert)">5成</strong></td><td>最多1只（3成）</td></tr>
+        <tr><td>1500-2500</td><td><span class="tag tag-orange">1.0+3.0</span></td><td><strong>9成</strong></td><td>1.0最多2只(6成)+3.0最多1只(3成)</td></tr>
+        <tr><td>2500-3500</td><td><span class="tag tag-blue">2.0+1.0</span></td><td><strong>7成</strong></td><td>最多2只（4+3成）</td></tr>
+        <tr><td>&gt;3500</td><td>辅助模式</td><td><strong style="color:var(--alert)">2成</strong></td><td>最多0-1只</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">体系B · 3.0 维度 · L1×L2矩阵</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">不适用固定3成，由产业位置×催化强度决定</div>
+      <div class="matrix-wrap">
+        <table>
+          <tr>
+            <th>L1\L2</th><th>无催化</th><th>有催化落地</th><th>有预期差</th>
+          </tr>
+          <tr>
+            <td><span class="tag tag-red">🔴高潮期(超级短缺)</span></td>
+            <td><strong>15%</strong></td>
+            <td><strong>20%</strong></td>
+            <td><strong style="color:var(--dim3)">25%</strong></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-yellow">🟡发酵期(产能爬坡)</span></td>
+            <td><strong>10%</strong></td>
+            <td><strong>15%</strong></td>
+            <td><strong>20%</strong></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-green">🟢启动期(早期转折)</span></td>
+            <td><strong>5%</strong></td>
+            <td><strong>10%</strong></td>
+            <td><strong>15%</strong></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔧 仓位修正规则（体系B）</div>
+    <div class="flow mt8">
+      <div class="flow-node">基础仓位（查矩阵）</div>
+      <div class="flow-arrow">+</div>
+      <div class="flow-node" style="border-color:var(--dim3);color:var(--dim3)">均线完美(MA5&gt;MA10&gt;MA20) +5%</div>
+      <div class="flow-arrow">+</div>
+      <div class="flow-node" style="border-color:var(--dim3);color:var(--dim3)">回踩MA10不破 +5%</div>
+      <div class="flow-arrow">+</div>
+      <div class="flow-node" style="border-color:var(--dim3);color:var(--dim3)">量能充足(额≥20亿) +5%</div>
+      <div class="flow-arrow">=</div>
+      <div class="flow-node" style="background:var(--dim3-bg);border-color:var(--dim3);color:var(--dim3)">上限25%</div>
+    </div>
+    <div class="alert-box warn mt12">
+      <span>⚠️</span>
+      <div><strong>最后风控</strong>：最坏推演（跌停-10%）→ 总回撤&gt;5%则降仓。例：总仓9成，3.0占25%，跌停回撤=2.5% ✅</div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">🚦 维度冲突处理</div>
+  <div class="card">
+    <div class="alert-box info">
+      <span>ℹ️</span>
+      <div>同一只票同时满足1.0和3.0 → 优先用<strong>3.0体系B</strong>（中线趋势仓位更科学）。但总仓仍需遵守情绪上限。</div>
+    </div>
+    <div style="margin-top:12px;font-size:13px">
+      <div class="rule-item">
+        <span class="rule-check">→</span>
+        <span>工业富联同时满足1.0分歧低吸 + 3.0趋势低吸</span>
+        <span class="tag tag-purple">→ 体系B（15%），不用体系A（3成）</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: STOP LOSS ============ -->
+<div class="section" id="sec-stop">
+  <div class="section-title">🛡️ 分维度止损体系（v2.3量化）</div>
+
+  <div class="grid-3 mb12">
+    <div class="dim-card dim1">
+      <div class="dim-header">
+        <span class="dim-num" style="color:var(--dim1)">1.0</span>
+        <div class="dim-name">硬止损</div>
+      </div>
+      <div class="dim-desc">买入价 <strong>-5%</strong><br>次日竞价割肉（不犹豫）</div>
+      <div class="dim-desc" style="margin-top:4px">时间止损：买入后<strong>第3日</strong>未涨停 → 次日竞价卖出</div>
+    </div>
+
+    <div class="dim-card dim2">
+      <div class="dim-header">
+        <span class="dim-num" style="color:var(--dim2)">2.0</span>
+        <div class="dim-name">轮动容错</div>
+      </div>
+      <div class="dim-desc">买入价 <strong>-7%</strong><br>次日竞价割肉</div>
+      <div class="dim-desc" style="margin-top:4px">板块止损：板块整体跌幅&gt;3%<br>且个股破MA5 → 次日竞价卖出</div>
+    </div>
+
+    <div class="dim-card dim3">
+      <div class="dim-header">
+        <span class="dim-num" style="color:var(--dim3)">3.0</span>
+        <div class="dim-name">趋势止损</div>
+      </div>
+      <div class="dim-desc">技术止损：<strong>MA5下穿MA10</strong><br>持有期满后执行</div>
+      <div class="dim-desc" style="margin-top:4px">逻辑止损：<strong>催化落空</strong> → 立即清仓（不受持有期约束）</div>
+    </div>
+  </div>
+
+  <div class="card-title mb8">⚠️ 逻辑破坏 / 催化落空 · 量化定义（3.0专用）</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">判定条件</div>
+      <table>
+        <tr><th>类型</th><th>量化条件</th><th>判定时机</th></tr>
+        <tr><td><span class="tag tag-red">逻辑证伪</span></td><td>政策逆转（补贴取消）或技术颠覆（竞品替代）</td><td>公告后立即生效</td></tr>
+        <tr><td><span class="tag tag-red">催化落空</span></td><td>催化日期过+2日无资金流入+板块连续2日下跌</td><td>收盘复盘判定</td></tr>
+        <tr><td><span class="tag tag-red">赛道降级</span></td><td>赛道状态🔴→🟢（产业逻辑框架更新）</td><td>周日进化生效</td></tr>
+        <tr><td><span class="tag tag-yellow">一致高潮</span></td><td>赛道→🔴高潮边缘（人声鼎沸+换手率异常）</td><td>收盘复盘判定</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">判定流程</div>
+      <ol style="padding-left:20px;font-size:13px;line-height:2">
+        <li>收盘复盘中检查所有持仓标的的催化日历与赛道状态</li>
+        <li>如触发上表任一条件 → 标注「⚠️触发逻辑止损」</li>
+        <li>次日开盘前确认，开盘后<strong>立即执行卖出</strong></li>
+      </ol>
+      <div class="alert-box alert mt12">
+        <span>🚨</span>
+        <div>持有期约束是保护，不是枷锁。逻辑证伪时<strong>立即清仓</strong>，不受最低持有日限制。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: EVOLUTION ============ -->
+<div class="section" id="sec-evolution">
+  <div class="section-title">🔄 自我进化机制</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">⏰ 进化时间表</div>
+      <table>
+        <tr><th>时间</th><th>任务</th><th>内容</th></tr>
+        <tr>
+          <td>每日 00:00</td>
+          <td>龙虾每日进化优化</td>
+          <td>回顾昨日选股结果，微调打分权重，更新 trading-state.json</td>
+        </tr>
+        <tr>
+          <td>周日 20:00</td>
+          <td>龙虾产业图谱深度进化</td>
+          <td>更新产业逻辑框架、趋势容量池、新赛道发现</td>
+        </tr>
+        <tr>
+          <td>每日 12:30</td>
+          <td>规则一致性校验</td>
+          <td>verify_rules.sh 校验 lobster-rules.md 与 lobster-config.json 一致性</td>
+        </tr>
+        <tr>
+          <td>各任务完成后</td>
+          <td>IMA 知识库同步</td>
+          <td>调用 ima_sync.sh 归档当日选股与复盘数据</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 进化触发条件</div>
+      <ul class="rule-list">
+        <li><span class="rule-check">→</span>涨停池出现非11大赛道的新方向（连续2日≥3家涨停）</li>
+        <li><span class="rule-check">→</span>11大赛道中某赛道的催化节点兑现/落空</li>
+        <li><span class="rule-check">→</span>赛道状态从🟡变为🔴（或反向）</li>
+        <li><span class="rule-check">→</span>出现Tier 1级别催化剂（范式级）</li>
+        <li><span class="rule-check">→</span>同一赛道连续3日涨停集中</li>
+        <li><span class="rule-check">→</span>某赛道龙头跌停/板块集体跳水</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">📊 每日进化流程（嵌入收盘复盘）</div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Step 1</div>
+      <h3>涨停分布扫描</h3>
+      <div style="font-size:13px;color:var(--text-muted)">对比今日涨停板块分布 vs 11大赛道 → 新赛道信号？</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Step 2</div>
+      <h3>催化日历检查</h3>
+      <div style="font-size:13px;color:var(--text-muted)">近期有无兑现/落空？已兑现→移归档；落空→填原因评估影响</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Step 3</div>
+      <h3>赛道状态更新</h3>
+      <div style="font-size:13px;color:var(--text-muted)">更新赛道标签🔴/🟡/🟢，如有重大变化→更新文件+写入进化日记</div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">📋 进化输出目标</div>
+  <div class="card">
+    <div class="grid-3">
+      <div>
+        <div class="text-muted mb8">写入文件</div>
+        <ul class="rule-list">
+          <li><span class="rule-check">→</span>memory/YYYY-MM-DD.md</li>
+          <li><span class="rule-check">→</span>lobster-config.json</li>
+          <li><span class="rule-check">→</span>lobster-rules.md（版本更新）</li>
+          <li><span class="rule-check">→</span>trading/产业逻辑框架.md</li>
+          <li><span class="rule-check">→</span>IMA 知识库同步</li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-muted mb8">版本管理规则</div>
+        <ul class="rule-list">
+          <li><span class="rule-check">→</span>主版本X.0：重大规则变更（如加入3.0维度）</li>
+          <li><span class="rule-check">→</span>次版本X.Y：规则细化（如阈值调整）</li>
+          <li><span class="rule-check">→</span>文件大小作为版本健康度指标</li>
+          <li><span class="rule-check">→</span>v2.4 = 18912字节</li>
+        </ul>
+      </div>
+      <div>
+        <div class="text-muted mb8">版本记录</div>
+        <ul class="rule-list">
+          <li><span class="rule-check">→</span>v2.4（2026-05-20）：三项规则量化补完+持有期约束+分维度止损</li>
+          <li><span class="rule-check">→</span>v2.3：T+1纪律与分维度止损量化</li>
+          <li><span class="rule-check">→</span>v2.2：趋势池退出机制量化</li>
+          <li><span class="rule-check">→</span>v2.1：3.0冰点熔断5段规则</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: INDUSTRY ============ -->
+<div class="section" id="sec-industry">
+  <div class="section-title">🏭 产业逻辑框架 · 十一大赛道图谱</div>
+
+  <div class="alert-box success mb12">
+    <span>✅</span>
+    <div>底层投资范式转变：<strong>需求侧→供给侧</strong>（产能锁定·交付确定性），估值窗口10-30年。已涨3-10倍的"躺平简单题"→持有不追。</div>
+  </div>
+
+  <!-- Track Status Table -->
+  <div class="card mb12">
+    <div class="card-title">🚦 赛道状态速查（截至 2026-05-19）</div>
+    <div style="overflow-x:auto">
+      <table style="font-size:12px">
+        <tr>
+          <th>赛道</th><th>状态</th><th>确定性</th><th>预期差</th><th>代表标的</th>
+        </tr>
+        <tr><td>液冷</td><td><span class="tag tag-red">🔴超级短缺</span></td><td>★★★★★</td><td>#1</td><td>英维克、曙光数创</td></tr>
+        <tr><td>IDC/AIDC</td><td><span class="tag tag-red">🔴短缺确认</span></td><td>★★★★★</td><td>#2</td><td>润泽科技、工业富联</td></tr>
+        <tr><td>燃气轮机</td><td><span class="tag tag-red">🔴超级短缺</span></td><td>★★★★★</td><td>#3</td><td>东方电气、杰瑞股份</td></tr>
+        <tr><td>国产芯片(昇腾)</td><td><span class="tag tag-red">🔴产能锁定</span></td><td>★★★★★</td><td>—</td><td>寒武纪、海光信息</td></tr>
+        <tr><td>光纤</td><td><span class="tag tag-red">🔴短缺确认↑</span></td><td>★★★★★</td><td>#4</td><td>长飞光纤、亨通光电</td></tr>
+        <tr><td>陶瓷基板</td><td><span class="tag tag-yellow">🟡产能爬坡</span></td><td>★★★★★</td><td>#5</td><td>国瓷材料、江丰电子</td></tr>
+        <tr><td>光模块</td><td><span class="tag tag-red">🔴短缺确认</span></td><td>★★★★★</td><td>🟡高位</td><td>中际旭创、新易盛</td></tr>
+        <tr><td>存储超级周期</td><td><span class="tag tag-yellow">🟡鱼尾早期</span></td><td>★★★★</td><td>—</td><td>江波龙、香农芯创</td></tr>
+        <tr><td>BBU/钠电</td><td><span class="tag tag-red">🔴短缺确认</span></td><td>★★★★</td><td>—</td><td>杰华特、蔚蓝锂芯</td></tr>
+        <tr><td>国产光刻机</td><td><span class="tag tag-yellow">🟡加速期↑</span></td><td>★★★★☆</td><td>#5</td><td>—</td></tr>
+        <tr><td>SOFC</td><td><span class="tag tag-green">🟢转折点</span></td><td>★★★★</td><td>#6</td><td>三环集团、雄韬股份</td></tr>
+        <tr><td>工程器械</td><td><span class="tag tag-yellow">🟡底部反转</span></td><td>★★★★</td><td>—</td><td>三一、徐工、柳工</td></tr>
+        <tr><td>氟化工</td><td><span class="tag tag-yellow">🟡产能爬坡↑</span></td><td>★★★★</td><td>#11</td><td>多氟多、三美股份</td></tr>
+        <tr><td>DCI</td><td><span class="tag tag-yellow">🟡观察窗口↑</span></td><td>★★★★</td><td>#9</td><td>中际旭创、新易盛</td></tr>
+        <tr><td>国产Switch芯片</td><td><span class="tag tag-green">🟢加仓窗口</span></td><td>★★★★</td><td>#7</td><td>盛科通信</td></tr>
+        <tr><td>电子特气</td><td><span class="tag tag-green">🟢早期(候选)</span></td><td>★★★</td><td>#12</td><td>中船特气、兴福电子</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- L2 Catalyst -->
+  <div class="card-title mb8">💥 四级催化剂体系（L2层）</div>
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Tier 1 · 范式级</div>
+      <h3 style="color:var(--dim3)">20-25%</h3>
+      <div style="font-size:12px;color:var(--text-muted)">彻底改变行业TAM或竞争格局</div>
+      <div style="font-size:11px;margin-top:8px">例：DS-V4+昇腾适配、字节AIDC爆发</div>
+      <div style="font-size:12px;margin-top:4px"><strong>持有周期：季度至年度</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tier 2 · 周期确认级</div>
+      <h3 style="color:var(--dim2)">15-20%</h3>
+      <div style="font-size:12px;color:var(--text-muted)">验证供需缺口持续时间</div>
+      <div style="font-size:11px;margin-top:8px">例：长鑫Q1营收508亿/净利330亿</div>
+      <div style="font-size:12px;margin-top:4px"><strong>持有周期：月度至季度</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tier 3 · 资金驱动级</div>
+      <h3 style="color:var(--dim1)">10-15%</h3>
+      <div style="font-size:12px;color:var(--text-muted)">大额订单、政策催化</div>
+      <div style="font-size:11px;margin-top:8px">例：杰瑞签西门子能源、格力液冷方案</div>
+      <div style="font-size:12px;margin-top:4px"><strong>持有周期：周度至月度</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tier 4 · 补涨扩散级</div>
+      <h3 style="color:var(--text-muted)">5-10%</h3>
+      <div style="font-size:12px;color:var(--text-muted)">主线关联间接的扩散</div>
+      <div style="font-size:11px;margin-top:8px">例：DCI、HVLP铜箔</div>
+      <div style="font-size:12px;margin-top:4px"><strong>持有周期：日度至周度</strong></div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <!-- Catalyst Calendar -->
+  <div class="card-title mb8">📅 近期催化日历（5-8月）</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">✅ 已兑现</div>
+      <table style="font-size:12px">
+        <tr><th>日期</th><th>事件</th><th>赛道</th></tr>
+        <tr><td>5/11</td><td>半导体/存储爆发，创业板+3%</td><td>存储/算力</td></tr>
+        <tr><td>5/12</td><td>江丰同芯720万片陶瓷基板投产</td><td>陶瓷基板</td></tr>
+        <tr><td>5/14</td><td>格力AI液冷全栈方案发布</td><td>液冷/IDC</td></tr>
+        <tr><td>5/14</td><td>杰瑞签约西门子能源SGT工业燃机</td><td>燃气轮机</td></tr>
+        <tr><td>5/15</td><td>氟化工板块全线爆发（韩国采购涨价40%）</td><td>氟化工</td></tr>
+        <tr><td>5/17</td><td>长鑫Q1营收508亿/净利330亿</td><td>存储/HBM</td></tr>
+        <tr><td>5/18</td><td>弘信电子无锡Token工厂签约（华为昇腾384）</td><td>国产芯片/IDC</td></tr>
+        <tr><td>5/18</td><td>特种光纤价格暴涨10倍（央视报道）</td><td>光纤</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">⏳ 待兑现</div>
+      <table style="font-size:12px">
+        <tr><th>日期</th><th>事件</th><th>赛道</th></tr>
+        <tr><td>5月3-4周</td><td>字节泰国数据中心招标</td><td>IDC/液冷/DCI</td></tr>
+        <tr><td>5/27</td><td>腾讯Hy3/DS-V4-Pro正式商用</td><td>大模型/应用链</td></tr>
+        <tr><td>5月下旬</td><td>特斯拉机器人首批订单落地</td><td>T链</td></tr>
+        <tr><td>6月</td><td>长鑫科技IPO审核推进</td><td>存储/HBM</td></tr>
+        <tr><td>6月</td><td>苹果3D玻璃订单敲定</td><td>宇环数控/宇晶</td></tr>
+        <tr><td>6月</td><td>机床涨价（纽威订单持续性）</td><td>工程器械</td></tr>
+        <tr><td>6-7月</td><td>AIDC密集招标</td><td>液冷/IDC</td></tr>
+        <tr><td>7月</td><td>特斯拉机器人量产</td><td>机器人</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION: GRAPH ============ -->
+<div class="section" id="sec-graph">
+  <div class="section-title">🕸️ 龙虾系统 · 关系图谱（SVG可视化）</div>
+
+  <div class="graph-container">
+    <svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#8b949e"/>
+        </marker>
+        <marker id="arrOrange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#f97316" opacity="0.7"/>
+        </marker>
+        <marker id="arrBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity="0.7"/>
+        </marker>
+        <marker id="arrGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#22c55e" opacity="0.7"/>
+        </marker>
+        <marker id="arrPurple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#a78bfa" opacity="0.7"/>
+        </marker>
+      </defs>
+
+      <!-- BACKGROUND GRID -->
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1c2128" stroke-width="0.5"/>
+      </pattern>
+      <rect width="1200" height="900" fill="#0d1117"/>
+      <rect width="1200" height="900" fill="url(#grid)"/>
+
+      <!-- ==================== LAYER 0: CENTER ==================== -->
+      <!-- CENTER: LOBSTER SYSTEM -->
+      <circle cx="600" cy="380" r="62" fill="#0d1117" stroke="#a78bfa" stroke-width="3" filter="url(#glow)"/>
+      <circle cx="600" cy="380" r="55" fill="#1a1f2e"/>
+      <text x="600" y="370" text-anchor="middle" fill="#fff" font-size="18" font-weight="800">🦞</text>
+      <text x="600" y="386" text-anchor="middle" fill="#a78bfa" font-size="11">龙虾超短</text>
+      <text x="600" y="399" text-anchor="middle" fill="#8b949e" font-size="9">v2.4</text>
+      <!-- glow ring -->
+      <circle cx="600" cy="380" r="68" fill="none" stroke="#a78bfa" stroke-width="1" opacity="0.3" stroke-dasharray="4,3"/>
+
+      <!-- ==================== LAYER 1: TOP ==================== -->
+
+      <!-- EMOTION PANEL (left top) -->
+      <rect x="30" y="30" width="360" height="210" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="210" y="54" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="700">🌡️ 情绪周期（核心驱动）</text>
+      <text x="210" y="68" text-anchor="middle" fill="#8b949e" font-size="9">涨跌家数 → 维度与仓位切换</text>
+
+      <!-- Row 1: 3 emotion states -->
+      <rect x="55" y="82" width="90" height="55" rx="8" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="100" y="99" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="700">🧊 冰点</text>
+      <text x="100" y="113" text-anchor="middle" fill="#ef4444" font-size="10">&lt;1500</text>
+      <text x="100" y="127" text-anchor="middle" fill="#ef4444" font-size="8">→1.0主导</text>
+
+      <rect x="155" y="82" width="90" height="55" rx="8" fill="#eab308" opacity="0.12" stroke="#eab308" stroke-width="1.5"/>
+      <text x="200" y="99" text-anchor="middle" fill="#eab308" font-size="10" font-weight="700">📉 修复</text>
+      <text x="200" y="113" text-anchor="middle" fill="#eab308" font-size="10">1500-2500</text>
+      <text x="200" y="127" text-anchor="middle" fill="#eab308" font-size="8">→1.0+3.0</text>
+
+      <rect x="255" y="82" width="90" height="55" rx="8" fill="#3b82f6" opacity="0.12" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="300" y="99" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="700">📈 高潮</text>
+      <text x="300" y="113" text-anchor="middle" fill="#3b82f6" font-size="10">2500-3500</text>
+      <text x="300" y="127" text-anchor="middle" fill="#3b82f6" font-size="8">→2.0+1.0</text>
+
+      <!-- Row 2: 2 more states -->
+      <rect x="55" y="150" width="90" height="55" rx="8" fill="#ef4444" opacity="0.12" stroke="#ef4444" stroke-width="1.5"/>
+      <text x="100" y="167" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="700">🔴 极度高潮</text>
+      <text x="100" y="181" text-anchor="middle" fill="#ef4444" font-size="10">&gt;3500</text>
+      <text x="100" y="195" text-anchor="middle" fill="#ef4444" font-size="8">→辅助≤2成</text>
+
+      <rect x="255" y="150" width="90" height="55" rx="8" fill="#eab308" opacity="0.12" stroke="#eab308" stroke-width="1.5"/>
+      <text x="300" y="167" text-anchor="middle" fill="#eab308" font-size="10" font-weight="700">❄️ 冰点持续</text>
+      <text x="300" y="181" text-anchor="middle" fill="#eab308" font-size="10">&lt;2000</text>
+      <text x="300" y="195" text-anchor="middle" fill="#eab308" font-size="8">3.0休眠</text>
+
+      <!-- Arrow from emotion to center (left) -->
+      <path d="M 390 130 Q 480 180 538 310" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+
+      <!-- RULES PANEL (right top) -->
+      <rect x="820" y="30" width="350" height="210" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="995" y="54" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="700">📋 八大硬约束规则</text>
+
+      <text x="840" y="76" fill="#c9d1d9" font-size="9" font-weight="700">规则〇</text>
+      <text x="888" y="76" fill="#8b949e" font-size="9">三维度总览：涨跌家数→维度仓位切换</text>
+      <text x="840" y="92" fill="#c9d1d9" font-size="9" font-weight="700">规则一</text>
+      <text x="888" y="92" fill="#8b949e" font-size="9">模式条件不可放宽（100%遵守）</text>
+      <text x="840" y="108" fill="#c9d1d9" font-size="9" font-weight="700">规则二</text>
+      <text x="888" y="108" fill="#8b949e" font-size="9">跨维度候选≤3只，最坏-10%≤总回撤5%</text>
+      <text x="840" y="124" fill="#c9d1d9" font-size="9" font-weight="700">规则三</text>
+      <text x="888" y="124" fill="#8b949e" font-size="9">禁止预测性表述（用"如果X则Y"）</text>
+      <text x="840" y="140" fill="#c9d1d9" font-size="9" font-weight="700">规则四</text>
+      <text x="888" y="140" fill="#8b949e" font-size="9">仓位：1.0/2.0→体系A(3成) 3.0→体系B</text>
+      <text x="840" y="156" fill="#c9d1d9" font-size="9" font-weight="700">规则五</text>
+      <text x="888" y="156" fill="#8b949e" font-size="9">情绪修复确认：连续2日&gt;1700</text>
+      <text x="840" y="172" fill="#c9d1d9" font-size="9" font-weight="700">规则六</text>
+      <text x="888" y="172" fill="#8b949e" font-size="9">数据源：实时→腾讯 / 历史→akshare</text>
+      <text x="840" y="188" fill="#c9d1d9" font-size="9" font-weight="700">规则七</text>
+      <text x="888" y="188" fill="#8b949e" font-size="9">T+1纪律：1.0-5%/2.0-7%/3.0-MA5&lt;MA10</text>
+      <text x="840" y="204" fill="#c9d1d9" font-size="9" font-weight="700">规则八</text>
+      <text x="888" y="204" fill="#8b949e" font-size="9">盘前读取前一日memory文件</text>
+      <text x="840" y="220" fill="#c9d1d9" font-size="9" font-weight="700">禁止</text>
+      <text x="878" y="220" fill="#ef4444" font-size="9">T+0 / 预测 / AI自由裁量 / 庄股</text>
+
+      <!-- Arrow from rules to center (right) -->
+      <path d="M 820 130 Q 730 180 662 310" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+
+      <!-- ==================== LAYER 2: MIDDLE LEFT ==================== -->
+
+      <!-- DIM1 PANEL -->
+      <rect x="30" y="255" width="245" height="185" rx="10" fill="#f97316" opacity="0.06" stroke="#f97316" stroke-width="2"/>
+      <text x="152" y="278" text-anchor="middle" fill="#f97316" font-size="13" font-weight="800">🔥 1.0 点 · 打板</text>
+      <text x="152" y="292" text-anchor="middle" fill="#8b949e" font-size="9">&lt;1500主导 · 体系A(3成)</text>
+      <line x1="50" y1="302" x2="255" y2="302" stroke="#f97316" stroke-width="0.5" opacity="0.4"/>
+
+      <text x="50" y="316" fill="#c9d1d9" font-size="9" font-weight="600">一进二条件：</text>
+      <text x="50" y="328" fill="#8b949e" font-size="8">✓ 昨日首板涨停，换手率&gt;5%</text>
+      <text x="50" y="339" fill="#8b949e" font-size="8">✓ 量比&gt;1.5 · 竞量≥15%</text>
+      <text x="50" y="350" fill="#8b949e" font-size="8">✓ 高开6-10% · 首板额≤8000万</text>
+      <text x="50" y="361" fill="#8b949e" font-size="8">✓ 非一字板 / 非庄股</text>
+
+      <text x="50" y="376" fill="#c9d1d9" font-size="9" font-weight="600">分歧低吸：</text>
+      <text x="50" y="388" fill="#8b949e" font-size="8">✓ 连板数&lt;4 · 未破MA5/MA10</text>
+      <text x="50" y="399" fill="#8b949e" font-size="8">✓ 分时缩量</text>
+
+      <rect x="50" y="407" width="205" height="24" rx="4" fill="#f97316" opacity="0.15"/>
+      <text x="152" y="422" text-anchor="middle" fill="#f97316" font-size="9" font-weight="700">打分≥60分 · 止损：-5% / 3日未板</text>
+
+      <!-- Arrow from DIM1 to center -->
+      <path d="M 275 347 Q 420 340 538 330" fill="none" stroke="#f97316" stroke-width="2" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrOrange)"/>
+
+      <!-- DIM3 PANEL -->
+      <rect x="30" y="455" width="245" height="210" rx="10" fill="#22c55e" opacity="0.06" stroke="#22c55e" stroke-width="2"/>
+      <text x="152" y="478" text-anchor="middle" fill="#22c55e" font-size="13" font-weight="800">📈 3.0 面 · 容量趋势</text>
+      <text x="152" y="492" text-anchor="middle" fill="#8b949e" font-size="9">1500-2500辅助 · 体系B(矩阵)</text>
+      <line x1="50" y1="502" x2="255" y2="502" stroke="#22c55e" stroke-width="0.5" opacity="0.4"/>
+
+      <text x="50" y="516" fill="#c9d1d9" font-size="9" font-weight="600">入池条件：</text>
+      <text x="50" y="528" fill="#8b949e" font-size="8">✓ 产业逻辑支撑（框架.md）</text>
+      <text x="50" y="539" fill="#8b949e" font-size="8">✓ 成交额≥5亿</text>
+      <text x="50" y="550" fill="#8b949e" font-size="8">✓ MA5&gt;MA10 多头排列</text>
+      <text x="50" y="561" fill="#8b949e" font-size="8">✓ 回踩MA5不破</text>
+
+      <text x="50" y="576" fill="#c9d1d9" font-size="9" font-weight="600">仓位体系：</text>
+      <text x="50" y="588" fill="#8b949e" font-size="8">L1×L2矩阵（5%-25%浮动）</text>
+      <text x="50" y="599" fill="#8b949e" font-size="8">Tier-1≥5日 / Tier-2≥3日</text>
+
+      <text x="50" y="614" fill="#c9d1d9" font-size="9" font-weight="600">出池触发：</text>
+      <text x="50" y="626" fill="#8b949e" font-size="8">🔴 MA5&lt;MA10 立即 / 涨跌&lt;2000休眠</text>
+      <text x="50" y="637" fill="#8b949e" font-size="8">🔴 赛道🔴→🟢 / 逻辑破坏立即清仓</text>
+
+      <rect x="50" y="645" width="205" height="20" rx="4" fill="#22c55e" opacity="0.15"/>
+      <text x="152" y="658" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="700">打分≥30分 · 止损：MA5&lt;MA10</text>
+
+      <!-- Arrow from DIM3 to center (downward) -->
+      <path d="M 275 560 Q 420 560 538 390" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrGreen)"/>
+
+      <!-- ==================== LAYER 2: MIDDLE RIGHT ==================== -->
+
+      <!-- DIM2 PANEL -->
+      <rect x="925" y="255" width="245" height="185" rx="10" fill="#3b82f6" opacity="0.06" stroke="#3b82f6" stroke-width="2"/>
+      <text x="1048" y="278" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="800">🌊 2.0 线 · 板块轮动</text>
+      <text x="1048" y="292" text-anchor="middle" fill="#8b949e" font-size="9">2500-3500主导 · 体系A(3成)</text>
+      <line x1="945" y1="302" x2="1150" y2="302" stroke="#3b82f6" stroke-width="0.5" opacity="0.4"/>
+
+      <text x="945" y="316" fill="#c9d1d9" font-size="9" font-weight="600">板块卡位（硬约束）：</text>
+      <text x="945" y="328" fill="#8b949e" font-size="8">✓ 板块涨停≥3家（排除尾盘偷鸡）</text>
+      <text x="945" y="339" fill="#8b949e" font-size="8">  上午: 11:30前≥2家+涨幅&gt;2%</text>
+      <text x="945" y="350" fill="#8b949e" font-size="8">  或全天≥3家+封板&gt;30min</text>
+      <text x="945" y="361" fill="#8b949e" font-size="8">✓ 成交额≥5000万</text>
+
+      <text x="945" y="376" fill="#c9d1d9" font-size="9" font-weight="600">高低切：</text>
+      <text x="945" y="388" fill="#8b949e" font-size="8">✓ 前排已高(≥3板)</text>
+      <text x="945" y="399" fill="#8b949e" font-size="8">✓ 后排补涨启动（首板/二板）</text>
+
+      <rect x="945" y="407" width="205" height="24" rx="4" fill="#3b82f6" opacity="0.15"/>
+      <text x="1048" y="422" text-anchor="middle" fill="#3b82f6" font-size="9" font-weight="700">打分≥70分 · 止损：-7% / 板块跌&gt;3%</text>
+
+      <!-- Arrow from DIM2 to center -->
+      <path d="M 925 347 Q 780 340 662 330" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrBlue)"/>
+
+      <!-- DATA SOURCES PANEL (right middle) -->
+      <rect x="820" y="455" width="350" height="210" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="995" y="478" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="700">🗄️ 数据源优先级</text>
+
+      <rect x="840" y="493" width="310" height="28" rx="6" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+      <text x="855" y="509" fill="#22c55e" font-size="10" font-weight="700">✅ 实时涨跌</text>
+      <text x="1010" y="509" fill="#8b949e" font-size="9">→ 腾讯 qt.gtimg.cn</text>
+      <text x="1060" y="509" fill="#8b949e" font-size="9">(GB2312编码)</text>
+
+      <rect x="840" y="529" width="310" height="28" rx="6" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+      <text x="855" y="545" fill="#22c55e" font-size="10" font-weight="700">✅ 涨跌家数</text>
+      <text x="1010" y="545" fill="#8b949e" font-size="9">→ legulegu.com</text>
+
+      <rect x="840" y="565" width="310" height="28" rx="6" fill="#3b82f6" opacity="0.1" stroke="#3b82f6" stroke-width="1"/>
+      <text x="855" y="581" fill="#3b82f6" font-size="10" font-weight="700">✅ 历史K线/均线</text>
+      <text x="1010" y="581" fill="#8b949e" font-size="9">→ akshare stock_zh_a_hist</text>
+
+      <rect x="840" y="601" width="310" height="28" rx="6" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-width="1"/>
+      <text x="855" y="617" fill="#22c55e" font-size="10" font-weight="700">✅ 今日涨停池</text>
+      <text x="1010" y="617" fill="#8b949e" font-size="9">→ Playwright 东财ztb</text>
+
+      <rect x="840" y="637" width="310" height="28" rx="6" fill="#ef4444" opacity="0.1" stroke="#ef4444" stroke-width="1"/>
+      <text x="855" y="653" fill="#ef4444" font-size="10" font-weight="700">❌ akshare K线（延迟）</text>
+      <text x="1100" y="653" fill="#8b949e" font-size="9">仅前一交易日</text>
+
+      <!-- Arrow from data sources to center -->
+      <path d="M 820 560 Q 750 560 662 430" fill="none" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+
+      <!-- ==================== LAYER 3: BOTTOM ==================== -->
+
+      <!-- EVOLUTION PANEL (bottom center) -->
+      <rect x="280" y="690" width="640" height="150" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="600" y="716" text-anchor="middle" fill="#c9d1d9" font-size="13" font-weight="700">🔄 自我进化机制</text>
+
+      <!-- Evolution nodes -->
+      <circle cx="400" cy="760" r="28" fill="#22c55e" opacity="0.12" stroke="#22c55e" stroke-width="2"/>
+      <text x="400" y="754" text-anchor="middle" fill="#22c55e" font-size="9" font-weight="700">每日 00:00</text>
+      <text x="400" y="767" text-anchor="middle" fill="#8b949e" font-size="8">每日进化优化</text>
+
+      <circle cx="600" cy="760" r="28" fill="#3b82f6" opacity="0.12" stroke="#3b82f6" stroke-width="2"/>
+      <text x="600" y="754" text-anchor="middle" fill="#3b82f6" font-size="9" font-weight="700">周日 20:00</text>
+      <text x="600" y="767" text-anchor="middle" fill="#8b949e" font-size="8">产业图谱深度进化</text>
+
+      <circle cx="800" cy="760" r="28" fill="#a78bfa" opacity="0.12" stroke="#a78bfa" stroke-width="2"/>
+      <text x="800" y="754" text-anchor="middle" fill="#a78bfa" font-size="9" font-weight="700">每日 12:30</text>
+      <text x="800" y="767" text-anchor="middle" fill="#8b949e" font-size="8">规则一致性校验</text>
+
+      <!-- Arrows between evolution nodes -->
+      <line x1="428" y1="760" x2="572" y2="760" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <line x1="628" y1="760" x2="772" y2="760" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Evolution outputs -->
+      <text x="600" y="810" text-anchor="middle" fill="#8b949e" font-size="9">进化输出 → memory/YYYY-MM-DD.md + lobster-config.json + lobster-rules.md + IMA知识库</text>
+
+      <!--进化触发信号 row -->
+      <text x="300" y="832" fill="#c9d1d9" font-size="9" font-weight="700">进化触发：</text>
+      <text x="370" y="832" fill="#8b949e" font-size="8">新赛道2日≥3家涨停 / 催化兑现或落空 / 赛道状态🔴↔🟢 / Tier1催化剂 / 龙头跌停</text>
+
+      <!-- Arrow from evolution to center (up) -->
+      <path d="M 600 690 Q 600 620 600 442" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="5,3" opacity="0.7" marker-end="url(#arrPurple)"/>
+
+    </svg>
+  </div>
+
+  <div class="alert-box info mt12">
+    <span>ℹ️</span>
+    <div>知识图谱以龙虾超短交易系统v2.4为核心，涵盖：三维度框架、情绪周期、打分模型、仓位矩阵、止损体系、产业逻辑、进化机制。数据截至2026-05-20。</div>
+  </div>
+    <span>ℹ️</span>
+    <div>知识图谱以龙虾超短交易系统v2.4为核心，涵盖：三维度框架、情绪周期、打分模型、仓位矩阵、止损体系、产业逻辑、进化机制。数据截至2026-05-20。</div>
+  </div>
+</div>
+
+<!-- ============ SECTION: RULES ============ -->
+<div class="section" id="sec-rules">
+  <div class="section-title">📋 审计清单（v2.4 · 每次复盘前必查）</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">✅ 审计检查项</div>
+      <table>
+        <tr><th>#</th><th>规则</th><th>检查内容</th><th>状态</th></tr>
+        <tr><td>规则〇</td><td>三维度总览</td><td>三维度框架是否清晰？维度切换是否明确？</td><td></td></tr>
+        <tr><td>规则一</td><td>模式条件不可放宽</td><td>各维度条件是否100%遵守？</td><td></td></tr>
+        <tr><td>规则二</td><td>跨维度最终候选1-3只</td><td>是否通过最坏推演？总候选≤3？</td><td></td></tr>
+        <tr><td>规则三</td><td>禁止预测性表述</td><td>是否出现"大概率/必然/应该会"？</td><td></td></tr>
+        <tr><td>规则四</td><td>仓位规则（维度区分）</td><td>1.0/2.0=体系A(3成)？3.0=体系B矩阵？</td><td></td></tr>
+        <tr><td>规则五</td><td>情绪修复确认</td><td>连续2日&gt;1700才确认修复？</td><td></td></tr>
+        <tr><td>规则六</td><td>数据源优先级</td><td>实时→腾讯？历史→akshare？</td><td></td></tr>
+        <tr><td>规则七</td><td>T+1纪律与分维度止损</td><td>T+0？止损条件是否触发？</td><td></td></tr>
+        <tr><td>规则八</td><td>盘前跨日数据链路</td><td>是否读取前一日memory文件？</td><td></td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 审计结论格式模板</div>
+      <div class="font-mono" style="background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:12px;white-space:pre;line-height:1.8">
+【规则审计 YYYY-MM-DD】
+✅ 规则〇：三维度总览清晰
+✅ 规则一：模式条件未放宽
+❌ 规则三：发现预测性表述"明日大概率继续走强"
+   → 已修正为"如果明日涨跌家数&gt;1500，则修复延续"
+✅ 规则四：1.0/2.0仓位固定3成，3.0用L1×L2矩阵
+✅ 规则五：情绪修复确认准确（连续2日&gt;1700）
+✅ 规则六：数据源正确（实时→腾讯，历史→akshare）
+✅ 规则七：T+1纪律执行
+✅ 规则八：跨日数据链路建立
+
+审计结论：8/9 通过，已修正预测性表述
+      </div>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">🔑 禁止事项汇总（v2.4零容忍）</div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">🚫 选股禁止</div>
+      <ul class="rule-list">
+        <li><span class="rule-x">✗</span>独立分析（不用打分模型）</li>
+        <li><span class="rule-x">✗</span>跳过打分直接选股</li>
+        <li><span class="rule-x">✗</span>放宽任一维度条件</li>
+        <li><span class="rule-x">✗</span>超出1-3只候选范围</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🚫 表述禁止</div>
+      <ul class="rule-list">
+        <li><span class="rule-x">✗</span>"大概率"</li>
+        <li><span class="rule-x">✗</span>"必然"</li>
+        <li><span class="rule-x">✗</span>"应该会"</li>
+        <li><span class="rule-x">✗</span>"预计"/"说明"</li>
+        <li><span class="rule-x">✗</span>任何确定性表述</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">🚫 交易禁止</div>
+      <ul class="rule-list">
+        <li><span class="rule-x">✗</span>T+0（当日买当日卖）</li>
+        <li><span class="rule-x">✗</span>不止损</li>
+        <li><span class="rule-x">✗</span>追涨停板（冰点时）</li>
+        <li><span class="rule-x">✗</span>重仓单一标的（超25%）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="card-title mb8">📁 关键文件索引</div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">核心规则</div>
+      <ul class="rule-list" style="font-size:12px">
+        <li><span class="rule-check">→</span>lobster-rules.md（v2.4 · 18912字节）</li>
+        <li><span class="rule-check">→</span>trading/heartbeat-rules-full.md（v2.4）</li>
+        <li><span class="rule-check">→</span>lobster-config.json（v1.1）</li>
+        <li><span class="rule-check">→</span>trading/trading-state.json</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">选股脚本</div>
+      <ul class="rule-list" style="font-size:12px">
+        <li><span class="rule-check">→</span>lobster_premarket_engine.py</li>
+        <li><span class="rule-check">→</span>lobster_bid_filter_v2.py</li>
+        <li><span class="rule-check">→</span>scoring_calculator.py</li>
+        <li><span class="rule-check">→</span>lobster_backtest.py</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">知识库</div>
+      <ul class="rule-list" style="font-size:12px">
+        <li><span class="rule-check">→</span>trading/产业逻辑框架.md</li>
+        <li><span class="rule-check">→</span>trading/趋势容量池.md</li>
+        <li><span class="rule-check">→</span>trading/催化日历.md</li>
+        <li><span class="rule-check">→</span>trading/复盘模板.md</li>
+        <li><span class="rule-check">→</span>memory/YYYY-MM-DD.md</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</div><!-- end main -->
+
+<script>
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+
+</body>
+</html>

@@ -63,10 +63,14 @@ except FileNotFoundError:
     errors.append("关注股.md不存在")
 
 if errors:
-    print(f"\n🚨 前置校验失败 ({len(errors)}个问题):")
+    print(f"\n{'='*60}")
+    print(f"🚨 前置校验失败 ({len(errors)}个问题):")
     for e in errors:
-        print(f"  - {e}")
-    print(f"\n⚠️ 收盘复盘将在不完整数据下执行，结论可能不准确！")
+        print(f"  ❌ {e}")
+    print(f"{'='*60}")
+    print(f"⚠️ 警告：以下数据缺失，复盘结论可能不准确！")
+    print(f"⚠️ 建议：检查前置任务是否正常运行")
+    print(f"{'='*60}\n")
 else:
     print("\n✅ 所有前置校验通过")
 PYEOF
@@ -78,9 +82,13 @@ PYEOF
 
 ```bash
 python3 << 'PYEOF'
-import json, akshare as ak
+import json, akshare as ak, sys, os
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# 添加scripts目录到Python路径
+scripts_dir = Path('/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts')
+sys.path.insert(0, str(scripts_dir))
 
 today = datetime.now().strftime('%Y%m%d')
 yday = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
@@ -97,25 +105,48 @@ try:
         board_cnt[board] = board_cnt.get(board, 0) + 1
     with open(today_f, 'w') as f:
         json.dump({'date': today, 'board': board_cnt}, f, ensure_ascii=False)
-    print(f"✅ 今日板块涨停数据已保存")
+    print(f"✅ 今日板块涨停数据已保存 ({len(board_cnt)}个板块)")
 except Exception as e:
     print(f"⚠️ 保存今日数据失败: {e}")
     exit(0)
 
 # 检测连续2日≥3家涨停
 if yday_f.exists():
-    with open(yday_f) as f: d1 = json.load(f)
-    with open(today_f) as f: d2 = json.load(f)
+    with open(yday_f) as f:
+        d1 = json.load(f)
+    with open(today_f) as f:
+        d2 = json.load(f)
+    
+    # 找出连续2日≥3家涨停的板块
     new = [b for b in d2['board'] if d2['board'][b] >= 3 and b in d1['board'] and d1['board'][b] >= 3]
+    
     if new:
         print(f"🚨 新赛道候选（连续2日≥3家涨停）: {new}")
+        
+        # 板块名称标准化
+        try:
+            from normalize_sector_name import normalize_sector_name
+            
+            normalized_new = [normalize_sector_name(b) for b in new]
+            print(f"   标准化后: {normalized_new}")
+        except Exception as e:
+            print(f"⚠️ 板块名称标准化失败: {e}, 使用原始名称")
+            normalized_new = new
+        
+        # 检查是否在产业逻辑框架中（使用标准化名称）
         framework = Path('/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/产业逻辑框架.md').read_text()
-        pending = [b for b in new if b not in framework]
+        pending = []
+        for orig, norm in zip(new, normalized_new):
+            if norm not in framework:
+                pending.append(f"{orig}（→{norm}）")
+        
         if pending:
             with open('/tmp/pending_tracks.md', 'a') as f:
                 for b in pending:
                     f.write(f"- [ ] {b}（{today} 连续2日≥3家涨停）\n")
             print(f"   已写入 /tmp/pending_tracks.md，下次进化任务时审核")
+        else:
+            print("✅ 所有候选赛道已在框架中")
     else:
         print("✅ 无新赛道候选")
 else:
@@ -149,6 +180,27 @@ cat /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/催化日历.md
 
 ---
 
+## 步骤1.7：收盘要闻存档（必做）
+
+> 收盘复盘时，将今日收盘后的重要新闻/政策写入新闻存档。
+
+**操作**：
+1. **读取已有新闻（去重）**：先读 `trading/news/YYYY-MM-DD.md` 提取已有标题列表
+   ```bash
+   python3 /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/news_dedupe.py /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/news/$(date +%Y-%m-%d).md
+   ```
+2. 使用 `tencent-news` 搜索今日收盘后重要新闻（关键词：`A股 收盘 政策 公告`）
+3. **去重**：将搜索结果与步骤1的已有标题对比，剔除重复条目
+4. 将**去重后的新增条目**写入 `trading/news/YYYY-MM-DD.md` 的【收盘要闻】区
+5. 格式：`| MM-DD | 标题 | 来源名+URL | 赛道/板块 | 🔴高/🟡中/🟢低 | ✅已核实/⚠️待核实/❌存疑 |`
+6. **发布日期**：标注新闻原始发布日期（非采集日期），未知标`未知`并降级为⚠️待核实
+7. **核实状态**：官方来源(A级)直接✅，主流媒体(B级)需1次交叉验证，自媒体(C级)需2次，营销号(D级)默认❌存疑
+8. 如果文件已存在（盘前已创建），只追加到【收盘要闻】区
+9. 如果文件不存在，先创建完整模板再填写
+10. 特别关注：与催化日历未决事件相关的新闻 → 同时写入【催化剂相关新闻】区
+
+---
+
 ## 步骤0.5：读取复盘模板（必做）
 
 ```bash
@@ -178,7 +230,7 @@ for line in txt1.split(";"):
         parts = m.group(2).split("~")
         if len(parts) > 32:
             name = parts[1]
-            price = parts[3]
+            price = parts[4]  # parts[4]=当前价
             pct = parts[32]
             indices[name] = f"{price}({pct}%)"
             print(f"{name}: {price} ({pct}%)")
@@ -237,6 +289,39 @@ result = {
 }
 with open("/tmp/lobster_closing_data.json", "w") as f:
     json.dump(result, f, ensure_ascii=False, indent=2)
+
+# L1情绪反馈记录（追加到 feedback.json）
+import os as _os, datetime as _dt
+L1_FEEDBACK_PATH = f"{WS_PATH}/trading/feedback.json"
+try:
+    fb = json.load(open(L1_FEEDBACK_PATH)) if _os.path.exists(L1_FEEDBACK_PATH) else {}
+    if 'L1_emotion' not in fb:
+        fb['L1_emotion'] = {'records': [], 'stats': {'total_predictions': 0, 'last_updated': ''}, 'parameter_adjustments': []}
+    early_up = early_emo = None
+    if _os.path.exists('/tmp/lobster_early_emotion.json'):
+        try:
+            ee = json.load(open('/tmp/lobster_early_emotion.json'))
+            early_up = ee.get('up_count')
+            early_emo = ee.get('emo_tag')
+        except: pass
+    today_rec = {
+        'date': today,
+        'time': _dt.datetime.now().strftime('%H:%M'),
+        'actual_up': up_count,
+        'actual_down': down_count,
+        'actual_emo': emotion,
+        'actual_dim': dimension,
+        'early_up': early_up,
+        'early_emo': early_emo,
+        'pos_limit': pos_limit
+    }
+    fb['L1_emotion']['records'].append(today_rec)
+    fb['L1_emotion']['stats']['total_predictions'] = len(fb['L1_emotion']['records'])
+    fb['L1_emotion']['stats']['last_updated'] = today
+    json.dump(fb, open(L1_FEEDBACK_PATH, 'w'), ensure_ascii=False, indent=2)
+    print(f"L1情绪记录已追加: {emotion}({up_count}) 早盘={early_emo or '无'}")
+except Exception as e:
+    print(f"L1情绪记录失败: {e}")
 PYEOF
 ```
 
@@ -339,8 +424,8 @@ if zt_codes:
             if len(parts) > 32:
                 代码 = parts[2]
                 名称 = parts[1]
-                现价 = float(parts[3])
-                昨收 = float(parts[4])
+                现价 = float(parts[4])  # parts[4]=当前价
+                昨收 = float(parts[3])  # parts[3]=昨收
                 涨跌幅 = float(parts[32])
                 
                 # 计算涨停价
@@ -380,7 +465,138 @@ python3 -c "import json; print(json.dumps(json.load(open('/tmp/lobster_premarket
 
 ---
 
-## 步骤4：按复盘模板输出（9个章节）
+## 步骤3.5：读取模拟仓数据（必须执行，供步骤4第10章使用）
+
+> **必须执行**：读取今日模拟交易数据，步骤4输出第10章时不得写"待读取"或"0只"
+
+```bash
+python3 << 'PYEOF'
+import json, datetime
+
+today = datetime.date.today().strftime('%Y-%m-%d')
+pos_file = '/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/模拟持仓.json'
+
+try:
+    with open(pos_file) as f:
+        data = json.load(f)
+except Exception as e:
+    print(f'⚠️ 读取模拟持仓失败: {e}')
+    exit(0)
+
+# 今日买卖记录
+today_buys = [t for t in data.get('trade_log', []) if t['type'] == 'BUY' and t['date'] == today]
+today_sells = [t for t in data.get('trade_log', []) if t['type'] == 'SELL' and t['date'] == today]
+positions = data.get('positions', [])
+
+print(f'📊 模拟仓数据 ({today})')
+print(f'   总资产: {data["capital"]["total_assets"]:,.0f}  可用: {data["capital"]["available"]:,.0f}  市值: {data["capital"]["market_value"]:,.2f}')
+print()
+
+if today_buys:
+    print(f'📥 今日买入 {len(today_buys)} 笔:')
+    for t in today_buys:
+        print(f'   ✅ {t["name"]}({t["code"]})  {t["shares"]}股@{t["price"]:.2f}  维度:{t["dimension"]}  理由:{t.get("reason","")}')
+else:
+    print('📥 今日无买入')
+
+if today_sells:
+    print(f'\n📤 今日卖出 {len(today_sells)} 笔:')
+    for t in today_sells:
+        print(f'   🔴 {t["name"]}({t["code"]})  {t["shares"]}股@{t["price"]:.2f}  盈亏{t["pnl_pct"]:+.2f}%  原因:{t.get("reason",t.get("sell_type",""))}')
+else:
+    print('\n📤 今日无卖出')
+
+if positions:
+    print(f'\n📌 当前持仓 {len(positions)} 只:')
+    for p in positions:
+        cost_price = p.get('cost', 0) / p['shares'] if p['shares'] else 0
+        print(f'   🏗 {p["name"]}({p["code"]})  {p["shares"]}股  成本{cost_price:.2f}  浮盈{p.get("floating_pnl",0):+.0f}元')
+else:
+    print('\n📌 当前空仓')
+
+print()
+print('='*50)
+print('✅ 以上数据必须在复盘报告第10章「模拟仓表现」中填写，不得写"待读取"或"0只"')
+PYEOF
+```
+
+---
+
+## 步骤3.6：查询断板股（必须执行，供步骤4第2章使用）
+
+> **必须执行**：对比昨日涨停池与今日涨停池，找出「昨日涨停→今日未涨停」的断板股。步骤4输出第2章时不得写"待补充"。
+
+```bash
+python3 << 'PYEOF'
+import datetime, json, subprocess, sys
+try:
+    import akshare as ak
+except:
+    print('⚠️ akshare未安装')
+    sys.exit(0)
+
+today_dt = datetime.date.today()
+yesterday_dt = today_dt - datetime.timedelta(days=1)
+today_str = today_dt.strftime('%Y-%m-%d')
+yesterday_str = yesterday_dt.strftime('%Y-%m-%d')
+
+def get_zt_pool(date_str):
+    try:
+        df = ak.stock_zt_pool_em(date=date_str)
+        if df is not None and len(df) > 0:
+            return df
+    except:
+        pass
+    return None
+
+df_yest = get_zt_pool(yesterday_str)
+df_today = get_zt_pool(today_str)
+
+print(f'📋 断板股分析（{yesterday_str}→{today_str}）')
+
+if df_yest is None or len(df_yest) == 0:
+    print(f'  ⚠️ 昨日({yesterday_str})涨停池数据获取失败，无法计算断板股')
+    print('  建议：用legulegu.com涨停数据或手动补充')
+else:
+    yest_codes = set(df_yest['代码'].astype(str).tolist())
+    yest_names = dict(zip(df_yest['代码'].astype(str), df_yest['名称'].astype(str)))
+    yest_lb = dict(zip(df_yest['代码'].astype(str), df_yest['连板数'].astype(str))) if '连板数' in df_yest.columns else {}
+    
+    if df_today is not None and len(df_today) > 0:
+        today_codes = set(df_today['代码'].astype(str).tolist())
+    else:
+        today_codes = set()
+    
+    broken = sorted(yest_codes - today_codes)
+    continued = sorted(yest_codes & today_codes)
+    
+    print(f'  昨日涨停：{len(yest_codes)}只 | 今日继续涨停：{len(continued)}只 | 断板：{len(broken)}只')
+    
+    if broken:
+        print(f'\n  🔴 断板股（昨日涨停→今日未涨停）：')
+        for code in broken[:15]:
+            name = yest_names.get(code, code)
+            lb = yest_lb.get(code, '?')
+            print(f'    - {name}({code})  昨日{lb}板')
+    else:
+        print('  ✅ 无断板股（昨日涨停股今日全部继续涨停）')
+    
+    if continued:
+        print(f'\n  ✅ 继续涨停股：')
+        for code in continued[:10]:
+            name = yest_names.get(code, code)
+            lb = yest_lb.get(code, '?')
+            print(f'    - {name}({code})  昨日{lb}板→今日继续')
+
+print()
+print('='*50)
+print('✅ 以上断板股数据必须在复盘报告第2章「连板梯队分析-断板股」中填写，不得写"待补充"')
+PYEOF
+```
+
+---
+
+## 步骤4：按复盘模板输出（10个章节）
 
 > **必须严格按 `复盘模板.md` 格式输出，不得遗漏章节**
 
@@ -395,6 +611,7 @@ python3 -c "import json; print(json.dumps(json.load(open('/tmp/lobster_premarket
 7. **明日策略**：若情绪X则维度Y + 仓位Z
 8. **每日进化（待办）**：记录错误 + 优化建议
 9. **IMA同步**：确认同步状态
+10. **模拟仓表现**：持仓盈亏 + 买卖操作 + 卖点信号 🌟新
 
 ---
 
@@ -527,7 +744,7 @@ OUTPUT="/tmp/lobster_closing_$(date +%Y-%m-%d).md"
 # （agent会将复盘内容写入此文件）
 
 # 调用IMA同步脚本（含重试）
-bash ~/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/ima_sync.sh "$OUTPUT" "龙虾收盘复盘 $(date +%Y-%m-%d)"
+bash ~/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/ima_sync.sh "$OUTPUT" "龙虾收盘复盘 $(date +%Y-%m-%d)" 2>>/tmp/ima-errors.log
 
 # 移入每日复盘文件夹（可选）
 # curl -X POST "https://ima.qq.com/openapi/wiki/v1/move_knowledge" ...
@@ -590,11 +807,11 @@ for row in ws.iter_rows(min_row=2, max_col=1):
 # 从各数据源收集今日数据
 row_data = [today]
 
-# 维度（从 trading-state.json 读取）
+# 维度（从 系统状态.json 读取）
 try:
-    with open(f'{WS_PATH}/trading/trading-state.json') as f:
+    with open(f'{WS_PATH}/trading/系统状态.json') as f:
         state = json.load(f)
-    row_data.append(state.get('dimension', ''))
+    row_data.append(state.get('today', {}).get('dimension', ''))
 except:
     row_data.append('')
 
@@ -649,17 +866,236 @@ wb.save(FILE)
 
 ---
 
-## ✅ 完成标志
+## 模拟交易：收盘更新市值 + 输出状态
+
+```bash
+python3 << 'PYEOF'
+import sys, json, subprocess, re
+sys.path.insert(0, "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts")
+from simulated_trading import update_positions, status
+
+# 获取持仓股最新价
+try:
+    with open("/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/模拟持仓.json") as f:
+        pos_data = json.load(f)
+    codes = [p["code"] for p in pos_data["positions"]]
+    if codes:
+        q_list = [f"sh{c}" if c.startswith("6") else f"sz{c}" for c in codes]
+        r = subprocess.run(["curl","-s","--max-time","10",f"https://qt.gtimg.cn/q={chr(44).join(q_list)}"], capture_output=True, timeout=12)
+        raw = r.stdout
+        for enc in ["gb2312","gbk","utf-8"]:
+            try: txt = raw.decode(enc); break
+            except: continue
+        price_map = {}
+        for line in txt.split(";"):
+            m = re.search(r"v_\w+=\"([^"]*)\"", line)
+            if m:
+                vals = m.group(2).split("~")
+                if len(vals) > 4 and vals[4]:
+                    code = m.group(1)[2:]  # 去掉sh/sz前缀
+                    price_map[code] = float(vals[4])  # vals[4]=今收盘价
+        update_positions(price_map)
+    print("\n" + "="*40)
+    print("📊 模拟交易收盘状态")
+    print("="*40)
+    print(status())
+except Exception as e:
+    print(f"⚠️ 模拟交易更新失败: {e}")
+PYEOF
+```
+
+## 模拟交易：卖点检测（止损/止盈）
+
+收盘更新市值后，运行卖点检测器，自动触发止损/止盈：
+
+```bash
+python3 /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/lobster_sellpoint_detector.py
+```
+
+**检测逻辑**（对齐lobster-rules.md v2.3 + 止盈体系）：
+| 维度 | 逻辑 | 条件 |
+|------|------|------|
+| **1.0** | 硬止损 -5% / 时间止损(第3天未涨停) | 收盘价 < 买入价×0.95 |
+| **2.0** | 硬止损 -7% | 收盘价 < 买入价×0.93 |
+| **3.0** | 技术止损 MA5<MA10 | 均线死叉 |
+| **全部** | 时间止损 | 持仓>5个交易日 |
+| **1.0/2.0止盈** | 分时止盈（盘中执行，收盘复盘不做） | 盘中主高/次高判断 |
+| **3.0止盈** | Tier-1退出观察 | 浮盈>10%+检查催化兑现/板块分化 |
+
+**输出格式**：
+- 🔴 卖出 XX(XXXXX): 止损：回撤-3.50% ≤ -3%
+  - ✅ 卖出成功：XX(XXXXX) 卖出XX股@XX.XX 盈亏-XXX.XX(-X.XX%)
+
+> ⚡ 此步骤失败不应阻塞复盘流程，记录错误后继续。
+
+```bash
+python3 << 'PYEOF'
+try:
+    import subprocess
+    r = subprocess.run(['python3', '/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/lobster_sellpoint_detector.py'], 
+                      capture_output=True, timeout=30)
+    output = r.stdout.decode('utf-8', 'replace')
+    print(output)
+    if r.returncode != 0:
+        print(f"⚠️ 卖点检测失败: {r.stderr.decode('utf-8', 'replace')}")
+except Exception as e:
+    print(f"⚠️ 卖点检测异常: {e}")
+PYEOF
+```
+
+---
+
+## 五档数据分析（新增）
+
+读取今日五档快照文件 `trading/five_level_snapshots/YYYYMMDD.jsonl`，分析盘中买卖力量变化。
+
+```bash
+python3 << 'PYEOF'
+import json, os, datetime, collections
+
+WS = '/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5'
+today = datetime.date.today().strftime('%Y%m%d')
+snap_file = f'{WS}/trading/five_level_snapshots/{today}.jsonl'
+
+print('\n' + '='*40)
+print('📊 五档数据分析')
+print('='*40)
+
+if not os.path.exists(snap_file):
+    print(f'  ⚠️ 今日五档快照文件不存在: {snap_file}')
+    print(f'  💡 五档采集cron将在下一交易日09:25启动')
+    return
+
+# 读取所有快照
+records = []
+with open(snap_file) as f:
+    for line in f:
+        line = line.strip()
+        if line:
+            try:
+                records.append(json.loads(line))
+            except: pass
+
+if not records:
+    print(f'  ⚠️ 快照文件为空')
+    return
+
+print(f'  共{len(records)}条快照，{len(set(r["code"] for r in records))}只股票')
+
+# 按股票分组
+by_code = collections.defaultdict(list)
+for r in records:
+    by_code[r['code']].append(r)
+
+# 分析每只股票
+for code, recs in sorted(by_code.items()):
+    name = recs[0]['name']
+    print(f'\n  📌 {name}({code})')
+    
+    # 开盘/收盘五档
+    first = recs[0]
+    last = recs[-1]
+    
+    # 买卖比趋势
+    ratios = [r['ratio'] for r in recs]
+    avg_ratio = sum(ratios)/len(ratios)
+    
+    # 涨停判定（买一量巨大）
+    is_zt = any(r['bid'][0]['vol'] > 10000 for r in recs)
+    
+    # 跌停判定（卖一量巨大）
+    is_dt = any(r['ask'][0]['vol'] > 10000 for r in recs)
+    
+    print(f'    首笔: {first["time"]} 价{first["price"]}({first["pct"]:+.2f}%) 买卖比{first["ratio"]:.2f}')
+    print(f'    尾笔: {last["time"]} 价{last["price"]}({last["pct"]:+.2f}%) 买卖比{last["ratio"]:.2f}')
+    print(f'    平均买卖比: {avg_ratio:.2f}', end='')
+    
+    if is_zt:
+        print('  🔴涨停封板')
+    elif is_dt:
+        print('  🟢跌停')
+    elif avg_ratio > 2:
+        print('  ⚠️卖压重')
+    elif avg_ratio < 0.5:
+        print('  ✅买盘强')
+    else:
+        print('  ➡️平衡')
+    
+    # 价格区间
+    prices = [r['price'] for r in recs]
+    print(f'    价格区间: {min(prices):.2f} ~ {max(prices):.2f}')
+
+print('\n' + '='*40)
+print('✅ 五档分析完成')
+PYEOF
+```
+
+> 💡 五档数据由「龙虾五档采集」cron（09:25触发，每分钟采集）提供。
+> 若文件不存在，说明当日cron未运行（检查cron列表）。
+
+---
 
 - [ ] 已按复盘模板输出9个章节
 - [ ] 已更新 `trading/选股历史.md`
 - [ ] **已更新 `trading/催化日历.md`**（滚动归档+新催化追加）
 - [ ] 已同步IMA知识库
+- [ ] **已分析五档数据（盘中买卖力量）**
 - [ ] 已发送消息给用户
 - [ ] 已写入 `memory/YYYY-MM-DD.md`
 - [ ] 已追加 `trading/复盘数据库.xlsx`
+
+# 更新系统状态（供明日盘前3.0激活判断）
+# BUG修复: 不再依赖last_updated计算yesterday.date，改用last_close_date
+try:
+    import datetime
+    yesterday_state = {}
+    state_path = f'{WS_PATH}/trading/系统状态.json'
+    if os.path.exists(state_path):
+        with open(state_path) as f:
+            yesterday_state = json.load(f)
+    
+    # 上一交易日 = today - 1天（跳过周末自动处理）
+    today_dt = datetime.date.today()
+    prev_day = (today_dt - datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    new_state = {
+        '_meta': {'version': 2, 'purpose': '系统状态·统一文件'},
+        'last_updated': today,
+        'last_close_date': today,  # 今日收盘日期（用于明日盘前判断）
+        'yesterday': {
+            'up_count': yesterday_state.get('yesterday', {}).get('up_count', 0),  # 上上日的真实收盘数据
+            'date': yesterday_state.get('last_close_date', prev_day)  # 上一实际收盘日
+        },
+        'today': {
+            'up_count': up_count,
+            'down_count': down_count,
+            'zt_count': zt_count,
+            'dt_count': dt_count,
+            'dimension': emotion
+        }
+    }
+    with open(state_path, 'w') as f:
+        json.dump(new_state, f, ensure_ascii=False, indent=2)
+    print(f"✅ 系统状态已更新: 昨{new_state['yesterday']['up_count']}({new_state['yesterday']['date']})→今{up_count}({today})")
+except Exception as e:
+    print(f"⚠️ 更新系统状态失败: {e}")
 
 ---
 
 **任务版本**：v5（新增催化日历滚动更新）
 **最后更新**：2026-05-20
+
+---
+
+## 最后步骤：回复用户（必须执行）
+
+> **关键**：你已执行完所有步骤，生成了完整的收盘复盘报告
+> **必须**：立即回复用户，将复盘报告完整发送给用户
+> **禁止**：NO_REPLY、不回复、只写文件不推送
+>
+> 回复格式：
+> ```
+> 📊 龙虾收盘复盘 YYYY-MM-DD
+> 
+> [完整的9章节内容]
+> ```

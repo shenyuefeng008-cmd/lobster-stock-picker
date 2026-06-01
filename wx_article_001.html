@@ -1,0 +1,235 @@
+<p style="font-size:14px;color:#999;text-align:center;margin-bottom:24px">系列开篇 · 方法论 · 持续更新</p>
+
+<!-- ============================================================ -->
+<!-- 第一部分：项目缘起 -->
+<!-- ============================================================ -->
+<h1 style="font-size:22px;font-weight:700;margin-bottom:8px">🦞 龙虾选股 · 三年磨一个量化选股系统</h1>
+
+<p style="color:#666;font-size:13px;margin-bottom:24px">2026年5月25日 · 第001期 · 约3800字</p>
+
+<p>大家好，我是龙虾。这个号准备认真做下去。</p>
+
+<p>先别急着关注——让我说清楚这个号在干什么，你再决定要不要留下来。</p>
+
+<!-- ============================================================ -->
+<!-- 第二部分：风险警示（最优先） -->
+<!-- ============================================================ -->
+<div style="background:#fff3e0;border-left:4px solid #ff9800;padding:16px 20px;margin:24px 0;border-radius:4px">
+<p style="margin:0 0 8px 0"><strong>⚠️ 这是你在这个号读到的最重要的一段话：</strong></p>
+<ol style="margin:0;padding-left:20px">
+<li>本公众号所有内容仅作为<strong>个人交易系统的研发日志与研究记录</strong>，不构成任何投资建议。</li>
+<li>我不会推荐股票，不会喊单，不会画饼。</li>
+<li>我的选股系统会有错，会亏钱，会踩坑——我都会如实记录下来。</li>
+<li><strong>A股市场风险极大，任何策略都可能亏损本金</strong>。入市请用闲钱，做好全亏的准备。</li>
+<li>我只有一个目标：用代码和数据，把自己的交易逻辑讲清楚。你信也好，不信也好，自己判断。</li>
+</ol>
+</div>
+
+<p>这段话写在最前面，不是装样子。微信的监管规则、我的良心、以及这些年看过的韭菜故事，都告诉我：<strong>炒股类公众号，不写清楚免责声明就是害人害己。</strong></p>
+
+<!-- ============================================================ -->
+<!-- 第三部分：为什么要做这个系统 -->
+<!-- ============================================================ -->
+<h2 style="font-size:18px;font-weight:700;margin:32px 0 12px 0">一、这个系统是怎么来的</h2>
+
+<p>三年前我开始做量化交易研究。不是那种「写几行Python调个接口就能赚钱」的天真想法——我知道那是忽悠人的。</p>
+
+<p>我真正想做的是：<strong>把交易从「玄学」变成「工程」。</strong></p>
+
+<p>大多数人的交易是这样的：</p>
+<ul style="padding-left:20px;line-height:1.8">
+<li>看到一个涨停 → 追进去 → 被套</li>
+<li>看到一个消息 → 冲进去 → 被套</li>
+<li>看到一个大V推荐 → 买进去 → 被套</li>
+<li>亏损了 → 加仓摊平 → 被套更深</li>
+</ul>
+
+<p>有没有一种可能：<strong>把选股逻辑写进代码，让机器替你执行纪律？</strong></p>
+
+<p>人最大的问题是管不住自己。但代码不会。</p>
+
+<p>代码不会因为今天赚了钱就变得贪婪，不会因为昨天亏了钱就变得恐惧。它会老老实实按照规则判断：<strong>这个条件成立吗？成立就买，不成立就不买。</strong></p>
+
+<p>这就是龙虾系统的出发点。</p>
+
+<!-- ============================================================ -->
+<!-- 第四部分：选股方法论 -->
+<!-- ============================================================ -->
+<h2 style="font-size:18px;font-weight:700;margin:32px 0 12px 0">二、龙虾选股的三维框架</h2>
+
+<p>系统核心：<strong>点·线·面</strong> 三维度框架。</p>
+
+<div style="background:#f0f7ff;padding:16px 20px;margin:16px 0;border-radius:8px">
+<table style="width:100%;border-collapse:collapse;font-size:14px">
+<tr style="background:#e3efff">
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">维度</th>
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">名称</th>
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">核心逻辑</th>
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">适用情绪</th>
+</tr>
+<tr>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0;font-weight:700">1.0</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">点（打板）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">一进二涨停接力 + 分歧低吸</td>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0">&lt;1500</td>
+</tr>
+<tr>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0;font-weight:700">2.0</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">线（板块轮动）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">板块卡位 + 高低切换</td>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0">2500-3500</td>
+</tr>
+<tr>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0;font-weight:700">3.0</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">面（容量趋势）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">产业逻辑 + 趋势低吸</td>
+  <td style="padding:8px;text-align:center;border:1px solid #d0d0d0">1500-2500</td>
+</tr>
+</table>
+<p style="margin:8px 0 0 0;font-size:12px;color:#888">* 情绪依据：当天市场涨跌家数</p>
+</div>
+
+<p><strong>核心思想很简单：不同市场环境，用不同的策略。</strong></p>
+
+<p>市场好的时候（涨的多），做追涨打板；市场差的时候（跌的多），做分歧低吸；市场不好不坏的时候，做趋势慢涨。</p>
+
+<p>听起来很朴素对吧？但实际操作中，大多数人做反了：</p>
+<ul style="padding-left:20px;line-height:1.8">
+<li><strong>涨到高潮了，冲进去追板</strong> —— 第二天高开低走吃面</li>
+<li><strong>跌到冰点了，害怕割肉</strong> —— 割在最低点</li>
+</ul>
+
+<p>龙虾系统的核心能力就是：<strong>自动识别当天该用什么策略，并且强制自己执行。</strong></p>
+
+<p>代码不犹豫，代码不后悔。</p>
+
+<!-- ============================================================ -->
+<!-- 第五部分：风控体系 -->
+<!-- ============================================================ -->
+<h2 style="font-size:18px;font-weight:700;margin:32px 0 12px 0">三、风控：这个系统最贵的部分</h2>
+
+<p>你可能会觉得，一个选股系统最重要的是「选出涨停股」。</p>
+
+<p>错了。</p>
+
+<p><strong>最重要的是「亏钱时及时止损」。</strong></p>
+
+<p>三年打磨，这个系统加了五层风控：</p>
+
+<div style="background:#f5f5f5;padding:16px 20px;margin:16px 0;border-radius:8px">
+<p><strong>🛡️ 第一层：情绪过滤</strong><br/>
+涨跌家数低于1500 → 禁用追涨策略<br/>
+涨跌家数高于3500 → 禁用大部分策略，强制休息<br/>
+<span style="font-size:13px;color:#888">—— 市场不行的时候，少操作就是赚</span></p>
+
+<p><strong>🛡️ 第二层：仓位上限</strong><br/>
+冰点期（&lt;1500）→ 最多5成仓<br/>
+中性区（2000-2500）→ 最多9成仓<br/>
+高潮期（&gt;3500）→ 1-2成，辅助模式<br/>
+<span style="font-size:13px;color:#888">—— 决不允许满仓赌</span></p>
+
+<p><strong>🛡️ 第三层：硬止损</strong><br/>
+单只股票亏损 ≤ -7% → 无条件卖出<br/>
+<span style="font-size:13px;color:#888">—— 亏7%活的下来，亏30%活不下来</span></p>
+
+<p><strong>🛡️ 第四层：技术止损</strong><br/>
+跌破MA10 → 检查均线形态，确认破位则卖出<br/>
+<span style="font-size:13px;color:#888">—— 不幻想"还能涨回来"</span></p>
+
+<p><strong>🛡️ 第五层：催化剂否决权</strong><br/>
+产业利好强度不足 → 即使技术面符合也放弃<br/>
+<span style="font-size:13px;color:#888">—— 没有基本面支撑的涨停，是空中楼阁</span></p>
+</div>
+
+<p>这五层风控不是摆设，是写在代码里的——每天自动跑，自动检查，自动执行。</p>
+
+<p>大多数散户亏钱，不是因为选股差，而是因为<strong>没有止损纪律</strong>。</p>
+
+<p>这个号不吹"涨停率90%"，那都是骗人的。</p>
+
+<!-- ============================================================ -->
+<!-- 第六部分：目前成绩 -->
+<!-- ============================================================ -->
+<h2 style="font-size:18px;font-weight:700;margin:32px 0 12px 0">四、目前的真实成绩（截止5月25日）</h2>
+
+<p>这个系统2026年4月上线，模拟仓初始资金100万。下面是真实数据，不走样，不粉饰：</p>
+
+<div style="background:#f9f9f9;padding:16px 20px;margin:16px 0;border-radius:8px;text-align:center">
+<p style="margin:4px 0;font-size:28px;font-weight:bold;color:#c0392b">+2.44%</p>
+<p style="margin:4px 0;font-size:14px;color:#666">累计收益率（1个月）</p>
+<p style="margin:4px 0;font-size:14px;color:#888">总资产 1,024,372 元 · 盈利 24,372 元</p>
+</div>
+
+<p>你觉得这个收益高吗？</p>
+
+<p>相比那些号称"月赚50%"的大V，2.44%简直不值一提。</p>
+
+<p>但这是我的真实收益——没有美化、没有浮夸、没有「算上手续费」的借口。</p>
+
+<p>而且这一个月里我经历了：</p>
+<ul style="padding-left:20px;line-height:1.8">
+<li>冰点日买入被套（667涨4490跌，我还在买）</li>
+<li>涨停标的因为竞价模型bug没买上</li>
+<li>触发止损后股票第二天涨停（追悔莫及）</li>
+<li>多次代码bug导致系统误判</li>
+</ul>
+
+<p>这些我都会在后续的文章里如实写出来。<strong>因为公众号对我来说，不仅是展示成果的地方，更是记录问题的日志。</strong></p>
+
+<!-- ============================================================ -->
+<!-- 第七部分：这个号要做什么 -->
+<!-- ============================================================ -->
+<h2 style="font-size:18px;font-weight:700;margin:32px 0 12px 0">五、这个号会更新什么</h2>
+
+<p>这是一个<strong>持续更新的合集项目</strong>，内容安排如下：</p>
+
+<div style="background:#f0f7ff;padding:16px 20px;margin:16px 0;border-radius:8px">
+<table style="width:100%;border-collapse:collapse;font-size:14px">
+<tr style="background:#e3efff">
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">更新频率</th>
+  <th style="padding:8px;text-align:left;border:1px solid #d0d0d0">内容</th>
+</tr>
+<tr>
+  <td style="padding:8px;border:1px solid #d0d0d0"><strong>每日午间</strong>（11:30后）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">早盘情绪速报 · 买点监控 · 盘中信号</td>
+</tr>
+<tr>
+  <td style="padding:8px;border:1px solid #d0d0d0"><strong>每日收盘</strong>（15:00后）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">全天复盘 · 选股验证 · 模拟仓操作记录</td>
+</tr>
+<tr>
+  <td style="padding:8px;border:1px solid #d0d0d0"><strong>周报</strong>（每周日晚）</td>
+  <td style="padding:8px;border:1px solid #d0d0d0">本周总结 · 系统进化日志 · 参数调整</td>
+</tr>
+<tr>
+  <td style="padding:8px;border:1px solid #d0d0d0"><strong>不定期深度</strong></td>
+  <td style="padding:8px;border:1px solid #d0d0d0">策略回测 · 模型改造 · 实战心得</td>
+</tr>
+</table>
+</div>
+
+<p>你不一定每篇都看。但如果你想系统了解一个量化选股系统是怎么从0到1搭建、怎么犯错、怎么进化的——这个号可能是全网最真实的一个。</p>
+
+<p>我不会只发涨停板。我会发我踩进去的坑、割不下来的肉、改了又改的参数。</p>
+
+<p><strong>因为投资这件事，最重要的能力不是赚钱，是诚实面对自己。</strong></p>
+
+<!-- ============================================================ -->
+<!-- 第八部分：风险提示+关注引导 -->
+<!-- ============================================================ -->
+<div style="background:#fff3e0;border-left:4px solid #ff9800;padding:16px 20px;margin:24px 0;border-radius:4px">
+<strong>⚠️ 再次提醒：</strong><br/>
+本公众号所有内容仅作为个人交易系统的研究与记录，不构成任何投资建议。<br/>
+投资者据此操作，风险自担。A股市场有风险，入市需谨慎。
+</div>
+
+<p style="text-align:center;margin:32px 0">
+如果你觉得这个项目有点意思，可以关注我。<br/>
+我不会天天催你关注，今天这是第一次，也是最后一次。<br/>
+<strong>后面的文章，见真章。</strong>
+</p>
+
+<p style="text-align:center;color:#999;font-size:13px;margin-top:32px">
+📮 下期预告：龙虾选股系统的早期代码，有多烂？
+</p>
+

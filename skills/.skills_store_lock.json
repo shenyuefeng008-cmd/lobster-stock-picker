@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "multi-search-engine": {
+      "name": "Multi Search Engine",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=multi-search-engine",
+      "source": "community",
+      "version": "2.1.3",
+      "installedAt": "2026-05-27T23:36:13Z"
+    },
+    "pdf": {
+      "name": "Pdf",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=pdf",
+      "source": "community",
+      "version": "0.1.0",
+      "installedAt": "2026-05-27T23:36:43Z"
+    },
+    "qclaw-cron-skill": {
+      "name": "Qclaw Cron Skill",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=qclaw-cron-skill",
+      "source": "community",
+      "version": "1.0.0",
+      "installedAt": "2026-05-27T23:36:46Z"
+    },
+    "tencent-news": {
+      "name": "腾讯新闻",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=tencent-news",
+      "source": "community",
+      "version": "1.1.0",
+      "installedAt": "2026-05-27T23:36:48Z"
+    },
+    "bdpan-storage": {
+      "name": "Bdpan Storage",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=bdpan-storage",
+      "source": "community",
+      "version": "1.2.0",
+      "installedAt": "2026-05-27T23:36:51Z"
+    },
+    "email-skill": {
+      "name": "Email",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=email-skill",
+      "source": "community",
+      "version": "0.1.0",
+      "installedAt": "2026-05-27T23:36:55Z"
+    }
+  }
+}

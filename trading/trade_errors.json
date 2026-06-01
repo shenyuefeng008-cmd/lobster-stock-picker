@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "description": "L4执行控制 — 交易错误记录与冷却",
+    "created": "2026-05-24",
+    "version": "1.0"
+  },
+  "errors": [
+    {
+      "code": "603938",
+      "name": "三孚股份",
+      "reason": "1.0硬止损触发，浮亏-6.87%跌破-5%止损线",
+      "loss_pct": -7.27,
+      "date": "2026-05-25",
+      "sell_type": "止损"
+    },
+    {
+      "code": "603936",
+      "name": "博敏电子",
+      "reason": "1.0分歧低吸硬止损：回撤-7.00% ≤ -5%",
+      "loss_pct": -7.41,
+      "date": "2026-05-28",
+      "sell_type": "止损"
+    },
+    {
+      "code": "000539",
+      "name": "粤电力Ａ",
+      "reason": "1.0时间止损：持仓3天未涨停",
+      "loss_pct": -3.96,
+      "date": "2026-06-01",
+      "sell_type": "止损"
+    }
+  ],
+  "cooldown": {},
+  "stats": {
+    "total_errors": 0,
+    "by_code": {},
+    "by_reason": {}
+  }
+}
