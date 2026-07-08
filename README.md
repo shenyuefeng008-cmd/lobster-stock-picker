@@ -18,6 +18,7 @@
 
 - [功能概览](#功能概览)
 - [交易日时间线](#交易日时间线)
+- [回测系统](#回测系统)
 - [快速开始](#快速开始)
 - [API 配置指南](#api-配置指南)
 - [项目结构](#项目结构)
@@ -62,6 +63,70 @@
 ```
 
 > 此外还有周末 Bug 修复巡检、产业图谱深度进化等周度任务。
+
+---
+
+## 回测系统
+
+基于 thsdk 历史数据能力，对竞价异动和分钟 K 线策略进行离线回测，验证信号质量和策略有效性。
+
+### 回测脚本
+
+| 脚本 | 用途 | 输出 |
+|------|------|------|
+| `lobster_backtest_auction.py` | 竞价异动信号回测 | `reports/backtest_auction_YYYYMMDD.md` |
+| `lobster_backtest_minute.py` | 分钟K线信号回测 | `reports/backtest_minute_signals.json` |
+| `lobster_backtest_runner.py` | 回测执行器（整合上述两个） | `reports/backtest_summary_YYYYMMDD.md` |
+
+### 用法
+
+```bash
+# 一键运行全部回测（默认 60 天）
+python scripts/lobster_backtest_runner.py
+
+# 指定回测天数
+python scripts/lobster_backtest_runner.py --days 30
+
+# 指定单只股票
+python scripts/lobster_backtest_runner.py --code 000001
+
+# 仅运行竞价回测
+python scripts/lobster_backtest_runner.py --auction-only
+
+# 仅运行分钟 K 线回测
+python scripts/lobster_backtest_runner.py --minute-only
+
+# 单独运行竞价回测（指定日期范围）
+python scripts/lobster_backtest_auction.py --start 20260701 --end 20260707 --code 000001
+
+# 单独运行分钟 K 线回测
+python scripts/lobster_backtest_minute.py --days 30 --code 000001
+```
+
+### 回测指标
+
+| 维度 | 指标 |
+|------|------|
+| **竞价异动** | 命中率、次日溢价、信号后 5 日最大收益、信号日均收益 |
+| **分钟 K 线** | 量异动 T+1/T+3 涨跌幅与胜率、价突破 T+1/T+3 延续性 |
+| **汇总报告** | 信号总数、胜率、平均收益、最大回撤、简化夏普比率 |
+
+### 配置项
+
+在 `lobster-config.json` 中 `backtest` 节：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `default_days` | 60 | 默认回测交易日数 |
+| `auction_threshold.bid_increase_min` | 3.0 | 竞价涨幅最低阈值 (%) |
+| `auction_threshold.bid_volume_ratio` | 1.05 | 竞价量比最低阈值 |
+| `auction_threshold.open_rise_timeout_min` | 5 | 开盘急拉检测窗口 (分钟) |
+| `auction_threshold.open_rise_pct` | 3.0 | 开盘急拉涨幅阈值 (%) |
+| `minute_threshold.volume_spike_ratio` | 2.0 | 分钟量异动倍数 |
+| `minute_threshold.price_break_lookback` | 5 | 价格突破前 N 根 K 线 |
+| `minute_threshold.hold_days` | 3 | 持仓周期 (天) |
+
+> **注意**：thsdk 游客模式对历史数据有访问限制，代码已做好异常处理，数据不可用时会跳过并记录日志，不会中断整个回测流程。
 
 ---
 
