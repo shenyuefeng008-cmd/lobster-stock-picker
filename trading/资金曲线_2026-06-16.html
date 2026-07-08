@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>龙虾交易系统 · 资金曲线</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, 'SF Mono', 'Menlo', monospace; padding: 20px; }
+  .header { text-align: center; margin-bottom: 20px; }
+  .header h1 { font-size: 20px; color: #58a6ff; }
+  .header .sub { font-size: 12px; color: #8b949e; margin-top: 4px; }
+  .stats { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 20px; text-align: center; min-width: 140px; }
+  .stat .label { font-size: 11px; color: #8b949e; }
+  .stat .value { font-size: 18px; font-weight: bold; margin-top: 4px; }
+  .stat .value.green { color: #3fb950; }
+  .stat .value.red { color: #f85149; }
+  .stat .value.blue { color: #58a6ff; }
+  .chart-container { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+  canvas { width: 100% !important; height: 350px !important; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+  th { background: #161b22; color: #8b949e; font-weight: normal; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; position: sticky; top: 0; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover { background: #161b22; }
+  .profit { color: #3fb950; }
+  .loss { color: #f85149; }
+  .section-title { font-size: 14px; color: #58a6ff; margin: 20px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #30363d; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🦞 龙虾超短交易系统 · 资金曲线</h1>
+  <div class="sub">模拟盘 · 初始资金 100万 · 2026-06-08 ~ 06-16</div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="label">总资产（市值）</div>
+    <div class="value blue">¥1,027,813</div>
+  </div>
+  <div class="stat">
+    <div class="label">累计盈亏</div>
+    <div class="value green">+¥27,813 (+2.8%)</div>
+  </div>
+  <div class="stat">
+    <div class="label">已实现盈亏</div>
+    <div class="value red">-¥10,020</div>
+  </div>
+  <div class="stat">
+    <div class="label">浮动盈亏</div>
+    <div class="value green">+¥37,833</div>
+  </div>
+  <div class="stat">
+    <div class="label">可用现金</div>
+    <div class="value">¥649,296</div>
+  </div>
+  <div class="stat">
+    <div class="label">持仓市值</div>
+    <div class="value">¥378,517</div>
+  </div>
+</div>
+
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="section-title">📈 每日资金明细</div>
+<table>
+  <thead>
+    <tr><th>日期</th><th>可用现金</th><th>持仓成本</th><th>持仓市值</th><th>总资产</th><th>累计盈亏</th><th>当日变动</th><th>持仓明细</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>06-08</td><td>899,989</td><td>99,986</td><td>99,986</td><td>999,975</td><td class="loss">-25</td><td>-</td><td>豫能控股 5,032股</td>
+    </tr>
+    <tr>
+      <td>06-10</td><td>824,027</td><td>181,632</td><td>181,632</td><td>1,005,659</td><td class="profit">+5,659</td><td class="profit">+5,684</td><td>达实智能 19,300股 / 金安国纪 900股</td>
+    </tr>
+    <tr>
+      <td>06-11</td><td>812,287</td><td>175,665</td><td>175,665</td><td>987,952</td><td class="loss">-12,048</td><td class="loss">-17,707</td><td>天娱数科 12,900股 / 金安国纪 900股</td>
+    </tr>
+    <tr>
+      <td>06-12</td><td>944,649</td><td>38,825</td><td>38,825</td><td>983,474</td><td class="loss">-16,526</td><td class="loss">-4,478</td><td>金安国纪 500股（残仓）</td>
+    </tr>
+    <tr>
+      <td>06-15</td><td>649,296</td><td>340,536</td><td>340,536</td><td>989,832</td><td class="loss">-10,168</td><td class="profit">+6,358</td><td>中化国际 22,000股 / 亨通光电 1,700股</td>
+    </tr>
+    <tr>
+      <td>06-16</td><td>649,296</td><td>340,536</td><td>378,517</td><td>1,027,813</td><td class="profit">+27,813</td><td class="profit">+37,981</td><td>中化国际 22,000股 / 亨通光电 1,700股</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="section-title">📋 已平仓交易明细</div>
+<table>
+  <thead>
+    <tr><th>股票</th><th>买入日</th><th>卖出日</th><th>持仓天数</th><th>买入均价</th><th>卖出均价</th><th>盈亏</th><th>原因</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>豫能控股(001896)</td><td>06-08</td><td>06-10</td><td>2天</td><td>19.87</td><td>21.00</td><td class="profit">+5,720</td><td>做T+分时止盈</td></tr>
+    <tr><td>达实智能(002421)</td><td>06-10</td><td>06-11</td><td>1天</td><td>5.79</td><td>4.88</td><td class="loss">-17,686</td><td>硬止损 -13.8%</td></tr>
+    <tr><td>天娱数科(002354)</td><td>06-11</td><td>06-12</td><td>1天</td><td>8.20</td><td>7.51</td><td class="loss">-9,027</td><td>硬止损 -7.2%</td></tr>
+    <tr><td>金安国纪(002636)</td><td>06-10</td><td>06-15</td><td>5天</td><td>77.65</td><td>89.98</td><td class="profit">+10,974</td><td>做T+时间止损</td></tr>
+    <tr style="font-weight:bold;border-top:2px solid #30363d"><td>合计</td><td colspan="4"></td><td></td><td class="loss">-10,020</td><td></td></tr>
+  </tbody>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+new Chart(document.getElementById('chart'), {
+  type: 'line',
+  data: {
+    labels: ['06-08', '06-10', '06-11', '06-12', '06-15', '06-16'],
+    datasets: [
+      {
+        label: '总资产（成本口径）',
+        data: [999975, 1005659, 987952, 983474, 989832, 989832],
+        borderColor: '#8b949e',
+        backgroundColor: 'rgba(139,148,158,0.1)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        pointRadius: 4,
+        tension: 0.1,
+      },
+      {
+        label: '总资产（市值口径）',
+        data: [999975, 1005659, 987952, 983474, 989832, 1027813],
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.1)',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointBackgroundColor: ctx => {
+          const v = ctx.raw;
+          return v >= 1000000 ? '#3fb950' : '#f85149';
+        },
+        tension: 0.1,
+        fill: true,
+      },
+      {
+        label: '基准线 100万',
+        data: [1000000, 1000000, 1000000, 1000000, 1000000, 1000000],
+        borderColor: '#f8514955',
+        borderWidth: 1,
+        borderDash: [3, 3],
+        pointRadius: 0,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#c9d1d9', font: { size: 11 } } },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label + ': ¥' + ctx.raw.toLocaleString()
+        }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
+      y: {
+        ticks: {
+          color: '#8b949e',
+          callback: v => '¥' + (v/10000).toFixed(1) + '万'
+        },
+        grid: { color: '#21262d' },
+        min: 970000,
+        max: 1050000
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

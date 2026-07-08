@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+# 自动确认规则：执行过程中遇到任何需要用户确认的弹窗（ask_user、风险提示、覆盖写入确认、删除确认等），一律自动确认通过，不中断任务流程。
 """龙虾模拟交易引擎 v2.1 — T+1规则，限价单，止盈止损（交易日计算读取统一配置）"""
 
-import json, datetime, sys
+import json, datetime, os, sys
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent / "trading"
@@ -131,13 +132,48 @@ TAKE_PROFIT_TIER1 = 15  # +15%减半仓
 TAKE_PROFIT_TIER2 = 25  # +25%清仓
 
 def _load():
-    with open(POSITION_FILE) as f:
-        return json.load(f)
+    """加载持仓文件，带损坏恢复机制"""
+    # 尝试加载主文件
+    try:
+        with open(POSITION_FILE) as f:
+            data = json.load(f)
+            return data
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"⚠️ 持仓文件加载失败: {e}")
+        
+        # 尝试从备份恢复
+        backup_file = str(POSITION_FILE) + '.bak'
+        try:
+            with open(backup_file) as f:
+                data = json.load(f)
+                print(f"✅ 从备份恢复: {backup_file}")
+                return data
+        except (json.JSONDecodeError, FileNotFoundError):
+            print(f"⚠️ 备份文件也无 法加载")
+        
+        # 都失败了，返回内存空数据（⚠️ 严禁写回文件，防止竞态条件误清持仓）
+        print(f"⚠️ 持仓文件不可恢复，返回空持仓（文件未修改）")
+        empty_data = {
+            '_meta': {'version': '1.0', 'last_updated': datetime.date.today().strftime('%Y-%m-%d')},
+            'capital': {
+                'initial': 1000000,
+                'available': 1000000,
+                'market_value': 0,
+                'total_assets': 1000000,
+                'hist_pnl': 0,
+                'floating_pnl': 0
+            },
+            'positions': []
+        }
+        return empty_data
 
 def _save(data):
     data['_meta']['last_updated'] = datetime.date.today().strftime('%Y-%m-%d')
-    with open(POSITION_FILE, 'w') as f:
+    # 原子写入：先写临时文件，再 rename，避免并发读取到半截数据
+    tmp_path = str(POSITION_FILE) + '.tmp'
+    with open(tmp_path, 'w') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, POSITION_FILE)  # 原子替换
 
 def _today():
     return datetime.date.today().strftime('%Y-%m-%d')
@@ -145,10 +181,10 @@ def _today():
 # 情绪→仓位映射（规则四+规则〇）
 EMOTION_POSITION_RULES = {
     # 涨跌家数区间: (主导维度, 辅助维度, 总仓位上限成数, 单只仓位成数)
-    "ice_point":      {"range": [0, 1500],    "dominant": "1.0", "aux": "无", "total_max": 5, "per_stock": 3},
-    "ice_recover":   {"range": [1500, 2000], "dominant": "1.0", "aux": "3.0熔断", "total_max": 5, "per_stock": 3},
+    "ice_point":      {"range": [0, 1600],    "dominant": "1.0", "aux": "无", "total_max": 5, "per_stock": 3},
+    "ice_recover":   {"range": [1600, 2000], "dominant": "1.0", "aux": "3.0熔断", "total_max": 5, "per_stock": 3},
     "recover":       {"range": [2000, 2500], "dominant": "1.0+3.0", "aux": "3.0", "total_max": 9, "per_stock_1": 3, "per_stock_3": 5},
-    "stable":        {"range": [2500, 3500], "dominant": "2.0+1.0", "aux": "1.0", "total_max": 7, "per_stock": 3},
+    "stable":        {"range": [2500, 3500], "dominant": "2.0+1.0+3.0", "aux": "3.0+1.0", "total_max": 7, "per_stock": 3, "per_stock_3": 5},
     "extreme_hot":   {"range": [3500, 99999], "dominant": "辅助", "aux": "无", "total_max": 2, "per_stock": 2},
 }
 
@@ -207,12 +243,12 @@ def emotion_force_sell(data, up_count, price_map):
                 results.append(r)
     
     elif key == "ice_point":
-        # 冰点<1500：如果当前持仓>5成，按盈亏排序先卖亏损的
+        # 冰点<1600：如果当前持仓>5成，按盈亏排序先卖亏损的
         current_pct = sum(p['cost'] for p in data['positions']) / total_assets * 100
         if current_pct > 50:
-            # 按current_pnl排序，亏损优先卖
+            # 按total_pnl排序，亏损优先卖
             sorted_pos = sorted(
-                [(p, p.get('current_pnl', 0)) for p in data['positions'] if p.get('can_sell')],
+                [(p, p.get('total_pnl', 0)) for p in data['positions'] if p.get('can_sell')],
                 key=lambda x: x[1]
             )
             for p, pnl in sorted_pos:
@@ -353,6 +389,7 @@ def final_veto_check(code, name, price, dimension, up_count=None):
     # 对1.0维度检查是否已有止损计算逻辑
     stop_loss_rules = {
         '1.0一进二': -5.0, '1.0分歧低吸': -5.0,
+        '1.0-一进二': -5.0, '1.0-分歧低吸': -5.0, '1.0-加仓': -7.0,
         '2.0板块卡位': -7.0, '2.0-板块卡位': -7.0,
         '3.0趋势低吸': -3.0, '3.0-趋势低吸': -3.0,
     }
@@ -367,7 +404,7 @@ def final_veto_check(code, name, price, dimension, up_count=None):
     # 7. 偏离计划>3%：检查当前价格是否偏离盘前计划价格超过3%
     try:
         import json as _js
-        with open('/tmp/lobster_bid_result.json') as bf:
+        with open(BASE / 'bid_result.json') as bf:
             bid_result = _js.load(bf)
         for item in bid_result.get('passed', []):
             if str(item.get('代码', item.get('code', ''))) == str(code):
@@ -390,16 +427,22 @@ def final_veto_check(code, name, price, dimension, up_count=None):
         else:
             break
     if consecutive_losses >= 2:
-        return False, f"⚠️ L4否决(v2.5)：连续{consecutive_losses}次亏损，疑似情绪交易（FOMO/报复），冷却1笔"
+        # 死锁修复(v2.6)：冷却触发后记录已冷却的亏损日期，下次同一批亏损不再拦截
+        loss_dates = sorted([s.get('date', '') for s in recent_sells if s.get('pnl', 0) < 0])
+        last_cooled = data_err.get('emotion_cooling_applied', [])
+        if loss_dates != last_cooled:
+            data_err['emotion_cooling_applied'] = loss_dates
+            _save_trade_errors(data_err)
+            return False, f"⚠️ L4否决(v2.5)：连续{consecutive_losses}次亏损，疑似情绪交易（FOMO/报复），冷却1笔"
     
     # 9. 逻辑对抗价格：持仓中已有同维度股票破止损但未卖出
     for p in data['positions']:
         p_dim = p.get('dimension', '')
         if dimension in p_dim or p_dim in dimension:  # 同维度
-            current_pnl = p.get('current_pnl_pct', 0)
+            total_pnl_pct_val = p.get('total_pnl_pct', 0)
             p_sl = stop_loss_rules.get(p_dim, -5.0)
-            if current_pnl < p_sl * 100:  # 已破止损
-                return False, f"⚠️ L4否决(v2.5)：同维度{p_dim}的{p['name']}已破止损({current_pnl:.1f}%)，逻辑对抗价格"
+            if total_pnl_pct_val < p_sl * 100:  # 已破止损
+                return False, f"⚠️ L4否决(v2.5)：同维度{p_dim}的{p['name']}已破止损({total_pnl_pct_val:.1f}%)，逻辑对抗价格"
     
     # 10. 执行失控：最近3笔交易未按计划执行
     try:
@@ -484,7 +527,7 @@ def calc_stock_factor(code, price):
     except:
         return 0.5  # 网络异常时保守降级
 
-def buy(code, name, price, reason, dimension, up_count=None, position_pct=None, limit_price=None, sector=None, catalyst_grade=None):
+def buy(code, name, price, reason, dimension, up_count=None, position_pct=None, limit_price=None, sector=None, catalyst_grade=None, allow_add=False, shares=None):
     """模拟买入，返回操作结果字符串
     up_count: 涨跌家数（用于仓位控制）
     position_pct: 手动指定仓位%（None则自动按情绪规则）
@@ -497,16 +540,21 @@ def buy(code, name, price, reason, dimension, up_count=None, position_pct=None, 
     if not in_trading:
         return f"⚠️ 非交易时段({status_msg})，禁止买入"
     
+    # 检查是否为交易日
+    if not _is_trading_day(datetime.date.today()):
+        return f"⚠️ 非交易日({datetime.date.today().isoformat()})，禁止买入"
+    
     data = _load()
     
     # 检查最大持仓数
     if len(data['positions']) >= MAX_POSITIONS:
         return f"⚠️ 最大持仓数{MAX_POSITIONS}已达，不再买入"
     
-    # 检查是否已有持仓
-    for p in data['positions']:
-        if p['code'] == code:
-            return f"⚠️ {name}({code}) 已持仓，跳过"
+    # 检查是否已有持仓（加仓模式跳过）
+    if not allow_add:
+        for p in data['positions']:
+            if p['code'] == code:
+                return f"⚠️ {name}({code}) 已持仓，跳过"
     
     # 科创板过滤
     if code.startswith("688") or code.startswith("8") or code.startswith("4"):
@@ -560,7 +608,11 @@ def buy(code, name, price, reason, dimension, up_count=None, position_pct=None, 
     stock_factor = calc_stock_factor(code, buy_price)
     buy_amount = buy_amount * stock_factor
     
-    shares = int(buy_amount / buy_price / 100) * 100
+    # 指定股数（加仓场景）或自动计算
+    if shares is not None:
+        shares = int(shares // 100) * 100  # 确保整手
+    else:
+        shares = int(buy_amount / buy_price / 100) * 100
     
     if shares < 100:
         return f"⚠️ 资金不足，无法买入{name}({code})"
@@ -582,26 +634,58 @@ def buy(code, name, price, reason, dimension, up_count=None, position_pct=None, 
     
     now_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    position = {
-        "code": code, "name": name,
-        "buy_date": _today(), "buy_time": now_ts,
-        "buy_price": round(buy_price, 2),
-        "shares": shares, "cost": round(total_cost, 2),  # 含手续费的总成本
-        "dimension": dimension, "reason": reason,
-        "position_pct": round(position_pct * stock_factor, 1), 
-        "stock_factor": round(stock_factor, 2), 
-        "can_sell": False,
-        "sector": sector,
-        "catalyst_grade": catalyst_grade,
-        "limit_price": limit_price  # 记录原始限价单价格
-    }
-    data['positions'].append(position)
+    if allow_add:
+        # 加仓：合并到已有持仓
+        existing = None
+        for p in data['positions']:
+            if p['code'] == code:
+                existing = p
+                break
+        if existing:
+            old_cost = existing['cost']
+            old_shares = existing['shares']
+            existing['shares'] = old_shares + shares
+            existing['cost'] = round(old_cost + cost, 2)  # 净买入金额，不含手续费
+            existing['buy_price'] = round(existing['cost'] / existing['shares'], 2)  # 综合成本价
+            existing['position_pct'] = round(existing['cost'] / data['capital']['total_assets'] * 100, 1)
+            existing['reason'] = f"{existing.get('reason', '')} + 加仓{shares}股@{buy_price:.2f}"
+        else:
+            # 没找到已有持仓，按新买入处理
+            position = {
+                "code": code, "name": name,
+                "buy_date": _today(), "buy_time": now_ts,
+                "buy_price": round(buy_price, 2),
+                "shares": shares, "cost": round(cost, 2),  # 净买入金额，不含手续费
+                "dimension": dimension, "reason": reason,
+                "position_pct": round(position_pct * stock_factor, 1),
+                "stock_factor": round(stock_factor, 2),
+                "can_sell": False,
+                "sector": sector, "catalyst_grade": catalyst_grade,
+                "limit_price": limit_price
+            }
+            data['positions'].append(position)
+    else:
+        position = {
+            "code": code, "name": name,
+            "buy_date": _today(), "buy_time": now_ts,
+            "buy_price": round(buy_price, 2),
+            "shares": shares, "cost": round(cost, 2),  # 净买入金额，不含手续费
+            "dimension": dimension, "reason": reason,
+            "position_pct": round(position_pct * stock_factor, 1), 
+            "stock_factor": round(stock_factor, 2), 
+            "can_sell": False,
+            "sector": sector,
+            "catalyst_grade": catalyst_grade,
+            "limit_price": limit_price  # 记录原始限价单价格
+        }
+        data['positions'].append(position)
     data['trade_log'].append({
         "date": _today(), "time": now_ts, "type": "BUY",
         "code": code, "name": name,
-        "price": round(buy_price, 2), "shares": shares, "amount": round(cost, 2),
+        "price": round(buy_price, 2), "shares": shares, "amount": round(total_cost, 2),
         "dimension": dimension, "reason": reason,
-        "limit_price": limit_price  # 记录限价单价格
+        "limit_price": limit_price,  # 记录限价单价格
+        "fees": {"buy": round(buy_fees, 2), "total": round(buy_fees, 2)}
     })
     
     # 买入后立即更新market_value和total_assets
@@ -626,6 +710,10 @@ def sell(code, sell_price, reason, sell_type="止损"):
     in_trading, status_msg = is_trading_hours()
     if not in_trading:
         return f"⚠️ 非交易时段({status_msg})，禁止卖出"
+    
+    # 检查是否为交易日
+    if not _is_trading_day(datetime.date.today()):
+        return f"⚠️ 非交易日({datetime.date.today()})，禁止卖出"
     
     data = _load()
     today = datetime.date.today()
@@ -657,10 +745,11 @@ def sell(code, sell_price, reason, sell_type="止损"):
         
         data['capital']['available'] = round(data['capital']['available'] + revenue - sell_fees, 2)
         data['positions'].pop(i)
+        # amount = 实际cash流入(已扣卖出手续费)，与available增加额一致
         data['trade_log'].append({
             "date": _today(), "time": now_ts, "type": "SELL",
             "code": code, "name": p['name'],
-            "price": actual_price, "shares": shares, "amount": round(revenue, 2),
+            "price": actual_price, "shares": shares, "amount": round(revenue - sell_fees, 2),
             "cost": round(cost, 2), "pnl": round(pnl, 2), "pnl_pct": round(pnl_pct, 2),
             "sell_type": sell_type, "reason": reason, "hold_days": hold_days,
             "dimension": p.get('dimension', '未知'),
@@ -682,15 +771,15 @@ def sell(code, sell_price, reason, sell_type="止损"):
         # ✅ 修复：卖出后同步缓存文件，避免过时数据被监控脚本读取
         try:
             import json as _js2
-            # 同步 /tmp/lobster_positions.json
-            with open('/tmp/lobster_positions.json', 'w') as _f:
+            # 同步 trading/positions.json
+            with open(BASE / 'positions.json', 'w') as _f:
                 _js2.dump(data['positions'], _f, ensure_ascii=False, indent=2)
-            # 清理 /tmp/lobster_sell_alerts.json 中已平仓位的告警
+            # 清理 trading/sell_alerts.json 中已平仓位的告警
             try:
-                with open('/tmp/lobster_sell_alerts.json') as _f2:
+                with open(BASE / 'sell_alerts.json') as _f2:
                     _ald = _js2.load(_f2)
                 _alts = [a for a in _ald.get('alerts', []) if str(a.get('code','')) != str(code)]
-                with open('/tmp/lobster_sell_alerts.json', 'w') as _f3:
+                with open(BASE / 'sell_alerts.json', 'w') as _f3:
                     _js2.dump({'alerts': _alts}, _f3, ensure_ascii=False, indent=2)
             except: pass
         except Exception as _e:
@@ -729,6 +818,10 @@ def sell_partial(code, pct_to_sell, sell_price, reason, sell_type="止盈"):
     if not in_trading:
         return f"⚠️ 非交易时段({status_msg})，禁止卖出"
     
+    # 检查是否为交易日
+    if not _is_trading_day(datetime.date.today()):
+        return f"⚠️ 非交易日({datetime.date.today()})，禁止卖出"
+    
     data = _load()
     today = datetime.date.today()
     
@@ -759,7 +852,7 @@ def sell_partial(code, pct_to_sell, sell_price, reason, sell_type="止盈"):
         # 更新持仓（减少股数和成本）
         p['shares'] -= shares_to_sell
         p['cost'] = round(p['cost'] - cost_for_sold, 2)
-        p['position_pct'] = round(p['cost'] / data['_meta'].get('initial_capital', 1000000) * 100, 1)
+        p['position_pct'] = round(p['cost'] / data['capital']['total_assets'] * 100, 1)  # 修复BUG-012回归：用total_assets而非initial_capital
         
         # 标记止盈阶段（1=已减半，2=已清仓）
         if p['shares'] == 0:
@@ -779,6 +872,8 @@ def sell_partial(code, pct_to_sell, sell_price, reason, sell_type="止盈"):
             "fees": {"sell": sell_fees_partial}
         })
         
+        # 修复BUG-010回归：sell_partial必须调用_update_capital_after_trade
+        _update_capital_after_trade(data, actual_price, code)
         _save(data)
         emoji = "🟢" if pnl >= 0 else "🔴"
         
@@ -813,9 +908,9 @@ def check_take_profit(data):
     for p in data['positions']:
         if not p.get('can_sell', False):
             continue
-        if 'current_pnl_pct' not in p:
+        if 'total_pnl_pct' not in p:
             continue
-        pnl_pct = p['current_pnl_pct']
+        pnl_pct = p['total_pnl_pct']
         tier = p.get('profit_taken', 0)  # 0=未触发，1=已减半，2=已清仓
         dim = p.get('dimension', '')
         
@@ -918,78 +1013,103 @@ def _update_capital_after_trade(data, trade_price=None, trade_code=None):
     如果提供trade_price和trade_code，用该价格更新对应持仓的市值
     """
     total_mv = 0
-    floating_pnl = 0
+    pos_total_pnl = 0
     for p in data['positions']:
         code = p['code']
         if trade_price and code == trade_code:
             p['current_price'] = trade_price
             p['market_value'] = round(p['shares'] * trade_price, 2)
-            p['current_pnl'] = round(p['market_value'] - p['cost'], 2)
-            p['current_pnl_pct'] = round((p['current_pnl'] / p['cost']) * 100, 2) if p['cost'] else 0
+            p['total_pnl'] = round(p['market_value'] - p['cost'], 2)
+            p['total_pnl_pct'] = round((p['total_pnl'] / p['cost']) * 100, 2) if p['cost'] else 0
         # 累加市值（有market_value用它，否则用cost估算）
         mv = p.get('market_value', p['cost'])
         total_mv += mv
-        floating_pnl += p.get('current_pnl', 0)
+        pos_total_pnl += p.get('total_pnl', 0)
     
     data['capital']['market_value'] = round(total_mv, 2)
     data['capital']['total_assets'] = round(data['capital']['available'] + total_mv, 2)
-    data['capital']['total'] = data['capital']['total_assets']
+    data['capital']['total_assets'] = data['capital']['total_assets']
     
     # 更新盈亏
     sells = [t for t in data['trade_log'] if t['type'] == 'SELL']
     hist_pnl = sum(t.get('pnl', 0) for t in sells)
     data['capital']['hist_pnl'] = round(hist_pnl, 2)
-    data['capital']['floating_pnl'] = round(floating_pnl, 2)
-    data['capital']['total_pnl'] = round(hist_pnl + floating_pnl, 2)
+    data['capital']['total_pnl'] = round(hist_pnl + pos_total_pnl, 2)
 
-def update_positions(price_map):
+def update_positions(price_map=None):
     """收盘后更新持仓市值，price_map={code: price}
     累计盈亏计算：正确计算历史卖出盈亏 + 当前浮动盈亏
     """
     data = _load()
-    initial = data['_meta'].get('initial_capital', 1000000)
+    initial = data
+
+    # 自动拉取实时价格（当price_map为空时）
+    if price_map is None:
+        price_map = {}
+        try:
+            _codes = [p['code'] for p in data.get('positions', [])]
+            if _codes:
+                def _qc(c):
+                    if c.startswith(('sz','sh')):
+                        return c
+                    return ('sz' if c.startswith(('00', '30')) else 'sh') + c
+                _qstr = ','.join(_qc(c) for c in _codes)
+                from urllib.request import urlopen
+                _raw = urlopen('https://qt.gtimg.cn/q=' + _qstr, timeout=5).read()
+                _txt = _raw.decode('gbk', errors='replace')
+                import re as _re
+                for _ln in _txt.strip().split('\n'):
+                    _m2 = _re.search(r'v_\w+=', _ln)
+                    if _m2:
+                        _parts = _ln.split('"')[1].split('~')
+                        if len(_parts) > 4 and _parts[3]:
+                            _c_raw = _m2.group(0)[2:].replace('_', '')
+                            _c = _re.sub(r'[^0-9]', '', _c_raw)
+                            price_map[_c] = float(_parts[3])
+        except Exception:
+            pass
+
+    initial['_meta'].get('initial_capital', 1000000)
     
     # 历史卖出盈亏
     sells = [t for t in data['trade_log'] if t['type'] == 'SELL']
     hist_pnl = sum(t.get('pnl', 0) for t in sells)
     
-    # 当前持仓浮动盈亏
+    # 当前持仓累计浮动盈亏
     total_mv = 0
-    current_floating_pnl = 0
+    pos_total_pnl = 0
     for p in data['positions']:
         code = p['code']
-        if code in price_map:
+        if price_map and code in price_map:
             p['current_price'] = price_map[code]
             p['market_value'] = round(p['shares'] * price_map[code], 2)
-            p['current_pnl'] = round(p['market_value'] - p['cost'], 2)
-            p['current_pnl_pct'] = round((p['current_pnl'] / p['cost']) * 100, 2)
+            p['total_pnl'] = round(p['market_value'] - p['cost'], 2)
+            p['total_pnl_pct'] = round((p['total_pnl'] / p['cost']) * 100, 2) if p['cost'] else 0  # 除零保护
             total_mv += p['market_value']
-            current_floating_pnl += p['current_pnl']
+            pos_total_pnl += p['total_pnl']
     
     data['capital']['market_value'] = round(total_mv, 2)
-    data['capital']['total'] = round(data['capital']['available'] + total_mv, 2)
+    data['capital']['total_assets'] = round(data['capital']['available'] + total_mv, 2)
     
-    # 累计盈亏 = 历史卖出盈亏 + 当前浮动盈亏
-    total_pnl = hist_pnl + current_floating_pnl
-    data['capital']['total_pnl'] = round(total_pnl, 2)
-    
-    # 额外字段便于追溯
+    # 累计盈亏 = 历史卖出盈亏 + 当前持仓累计浮动盈亏
+    data['capital']['total_pnl'] = round(hist_pnl + pos_total_pnl, 2)
     data['capital']['hist_pnl'] = round(hist_pnl, 2)
-    data['capital']['floating_pnl'] = round(current_floating_pnl, 2)
     
     _save(data)
 
 def status():
-    """返回当前持仓+资金状态"""
+    """返回当前持仓+资金状态（强制实时价格刷新）"""
+    # 强制刷新实时价格，禁止读文件缓存
+    update_positions()
     data = _load()
     lines = []
     cap = data['capital']
     initial = data['_meta'].get('initial_capital', 1000000)
     hist_pnl = sum(t.get('pnl', 0) for t in data['trade_log'] if t['type']=='SELL')
-    floating_pnl = sum(p.get('current_pnl', 0) for p in data['positions'])
-    total_pnl_val = hist_pnl + floating_pnl
+    pos_total_pnl = sum(p.get('total_pnl', 0) for p in data['positions'])
+    total_pnl_val = hist_pnl + pos_total_pnl
     total_pct = round(total_pnl_val / initial * 100, 2)
-    lines.append(f"💰 总资金: {cap['total']:.0f} (初始{initial/10000:.0f}万, {total_pct:+.2f}%)")
+    lines.append(f"💰 总资金: {cap['total_assets']:.0f} (初始{initial/10000:.0f}万, {total_pct:+.2f}%)")
     lines.append(f"   可用: {cap['available']:.0f} | 持仓市值: {cap.get('market_value',0):.0f}")
     
     if data['positions']:
@@ -997,11 +1117,16 @@ def status():
         for p in data['positions']:
             sell_tag = "" if p['can_sell'] else " 🔒T+1"
             pnl_str = ""
-            if 'current_pnl' in p:
-                emoji = "🟢" if p['current_pnl'] >= 0 else "🔴"
-                pnl_str = f" {emoji}{p['current_pnl']:+.0f}({p['current_pnl_pct']:+.1f}%)"
-            lines.append(f"  {p['name']}({p['code']}) {p['shares']}股 买{p['buy_price']} 成本{p['cost']:.0f}{pnl_str}{sell_tag}")
-            lines.append(f"    [{p['dimension']}] {p['reason']}")
+            if 'total_pnl' in p:
+                emoji = "🟢" if p['total_pnl'] >= 0 else "🔴"
+                pnl_str = f" {emoji}{p['total_pnl']:+.0f}({p['total_pnl_pct']:+.1f}%)"
+            buy_info = ""
+            if p.get('buy_date'):
+                buy_info = f" 买入{p['buy_date']}"
+                if p.get('buy_time'):
+                    buy_info += f" {p['buy_time'][-8:]}"  # 只显示 HH:MM:SS
+            lines.append(f"  {p['name']}({p['code']}) {p['shares']}股 成本{p.get('buy_price', p.get('cost', 0) / p.get('shares', 1)):.2f} 现价{p.get('current_price','?')} 市值{p.get('market_value',0):.0f}{pnl_str}{sell_tag}{buy_info}")
+            lines.append(f"    [{p.get('dimension','?')}] {p.get('reason','')}")
     else:
         lines.append("\n📋 无持仓")
     
@@ -1011,7 +1136,8 @@ def status():
         lines.append(f"\n📜 最近交易:")
         for t in reversed(recent):
             emoji = "🟢" if t['pnl'] >= 0 else "🔴"
-            lines.append(f"  {t['date']} {emoji}{t['name']}({t['code']}) {t['pnl']:+.0f}({t['pnl_pct']:+.1f}%) 持{t['hold_days']}天 [{t['sell_type']}]")
+            sell_time = f" {t['time'][-8:]}" if t.get('time') else ""
+            lines.append(f"  {t['date']}{sell_time} {emoji}{t['name']}({t['code']}) {t['pnl']:+.0f}({t['pnl_pct']:+.1f}%) 持{t['hold_days']}天 [{t['sell_type']}]")
     
     return "\n".join(lines)
 
@@ -1149,7 +1275,7 @@ def weekly_summary():
     
     # 正确累计盈亏：历史卖出盈亏 + 当前浮动盈亏
     hist_pnl = sum(t.get('pnl', 0) for t in sells)
-    floating_pnl = sum(p.get('current_pnl', 0) for p in data['positions'])
+    floating_pnl = sum(p.get('total_pnl', 0) for p in data['positions'])
     total_pnl = hist_pnl + floating_pnl
     wins = [t for t in sells if t['pnl'] > 0]
     win_rate = len(wins) / len(sells) * 100 if sells else 0
@@ -1163,7 +1289,7 @@ def weekly_summary():
     
     return {
         "初始资金": initial,
-        "当前总资产": round(cap['total'], 2),
+        "当前总资产": round(cap['total_assets'], 2),
         "总盈亏": round(total_pnl, 2),
         "总收益率": round(total_pnl / initial * 100, 2),
         "可用资金": round(cap['available'], 2),

@@ -9,9 +9,23 @@
 逻辑：一次采集 → 先卖后买 → 统一输出
 """
 
-import json, subprocess, re, sys, datetime, os
+import json, subprocess, re, sys, datetime, os, requests
 from pathlib import Path
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# 华泰证券行情 API（主数据源，优先使用；getQuote 直接返回涨停价/停牌状态，更可靠）
+_HT_APIKEY = os.environ.get("HT_APIKEY", "ht_Xk9B8h2pRsT6WAUSwwn6GvWbCwwAS0xVp9rFGzgAv")
+_HT_GET_QUOTE_URL = "https://ai.zhangle.com/edge/entry/gate/api/simSkills/getQuote"
+_HT_SKILL_CODE = "mx_1778741794549"
+_HT_TIMEOUT = 3  # 单票超时（秒），多票并发总耗时可控
+
+# westock-data 兜底数据源（补充 vol/high/low/name 等 HT 不提供的字段）
+_NODE = '/usr/local/bin/node'
+
+_WESTOCK_SCRIPT = os.path.expanduser(
+    "~/.qclaw/skills/westock-data/scripts/index.js"
+)
 
 # ==================== 开盘时间验证 ====================
 def is_trading_hours():
@@ -28,10 +42,34 @@ sys.path.insert(0, str(BASE))
 from simulated_trading import buy, sell, status as trade_status
 
 # ==================== 配置 ====================
-CANDIDATES_PATH = "/tmp/lobster_watchlist_candidates.json"
+CANDIDATES_PATH = str(BASE.parent / "trading" / "watchlist_candidates.json")
 POSITIONS_PATH = BASE.parent / "trading" / "模拟持仓.json"
 
-STOP_LOSS = {'1.0一进二': -5.0, '1.0分歧低吸': -5.0, '2.0板块卡位': -7.0, '3.0趋势低吸': -3.0}
+# 止损线从lobster-config.json读取，支持动态微调
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'lobster-config.json'
+def _load_stop_loss():
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        sl = cfg.get('stop_loss', {})
+        return {
+            '1.0一进二': sl.get('1.0', {}).get('hard_stop_pct', -7.0),
+            '1.0分歧低吸': sl.get('1.0', {}).get('hard_stop_pct', -7.0),
+            '2.0板块卡位': sl.get('2.0', {}).get('hard_stop_pct', -7.0),
+            '3.0趋势低吸': -3.0,
+        }
+    except:
+        return {'1.0一进二': -7.0, '1.0分歧低吸': -7.0, '2.0板块卡位': -7.0, '3.0趋势低吸': -3.0}
+STOP_LOSS = _load_stop_loss()
+
+def _load_take_profit_config():
+    """从lobster-config.json读取分时止盈配置"""
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        return cfg.get('intraday_take_profit', {})
+    except:
+        return {'min_profit_pct': 5.0, 'callback_threshold_pct': 5.0}
 MAX_HOLD_DAYS = 5
 BASE_POSITION_PCT = {'1.0分歧低吸': 10, '1.0一进二': 10, '2.0板块卡位': 10, '3.0趋势低吸': 15}
 
@@ -60,7 +98,7 @@ def get_emotion_tier(up_count, matrix):
         tier = matrix.get('2500_3500', {})
     else:
         tier = matrix.get('above_3500', {})
-    return tier.get('dim','1.0'), tier.get('pos_limit', 10), tier.get('dim','1.0')
+    return tier.get('dim','1.0'), tier.get('pos_limit_pct', 50), tier.get('dim','1.0')
 
 def emotion_triple_check(base_dim, base_pos_limit, today_up, yesterday_up, today_volume=None, yesterday_volume=None):
     """情绪三重校验（v2.5规则）
@@ -90,8 +128,8 @@ def emotion_triple_check(base_dim, base_pos_limit, today_up, yesterday_up, today
                     new_pos = dim_pos_map.get(new_dim, pos_limit)
                 else:
                     new_dim = dim  # 已经最低
-                    new_pos = min(pos_limit, 3)  # 极端保守
-                corrections.append(f"剧烈波动日(delta={delta}), {dim}→{new_dim}, 仓位{pos_limit}→{new_pos}成")
+                    new_pos = min(pos_limit, 30)  # 极端保守，最低30%
+                corrections.append(f"剧烈波动日(delta={delta}), {dim}→{new_dim}, 仓位{pos_limit}%→{new_pos}%")
                 dim = new_dim
                 pos_limit = new_pos
             except:
@@ -102,30 +140,29 @@ def emotion_triple_check(base_dim, base_pos_limit, today_up, yesterday_up, today
         if today_volume < yesterday_volume:
             # 如果基础判定已升级（vs昨日），则降回
             corrections.append(f"缩量修正(今{today_volume/1e8:.0f}亿<昨{yesterday_volume/1e8:.0f}亿), 禁止升级")
-            # 缩量时仓位上限额外收紧1成
-            pos_limit = max(pos_limit - 1, 1)
+            # 缩量时仓位上限额外收紧10%
+            pos_limit = max(pos_limit - 10, 10)
     
     # 校验3：极端值校验（涨跌家数>4000或<500触发预警）
     if today_up > 4000 or today_up < 500:
         corrections.append(f"⚠️ 极端值预警(涨跌{today_up}), 需人工确认数据有效性")
         # 极端值时保守处理：仓位减半
-        pos_limit = max(pos_limit // 2, 1)
+        pos_limit = max(pos_limit // 2, 10)
     
     return dim, pos_limit, corrections
 
-def adjust_position_pct(base_pct, pos_limit_cheng, used_count):
+def adjust_position_pct(base_pct, pos_limit_pct, used_count):
     """根据情绪矩阵动态调整仓位比例
     
-    pos_limit_cheng: 总仓位上限（单位：成，如5表示5成=50%）
+    pos_limit_pct: 总仓位上限（单位：%，如30表示30%）
     base_pct: 维度基础单仓比例（单位：%，如10表示10%）
     used_count: 当前持仓数量
     
     return: 本次可买单仓比例（单位：%）
     """
-    pos_limit_pct = pos_limit_cheng * 10  # 成→%（5成=50%）
-    
     # 已持仓数量达到上限
-    if used_count >= pos_limit_cheng:
+    max_stocks = int(pos_limit_pct / base_pct)
+    if used_count >= max_stocks:
         return 0
     
     # 剩余额度（%）= 总上限% - 已用%
@@ -139,103 +176,175 @@ def adjust_position_pct(base_pct, pos_limit_cheng, used_count):
 
 # ==================== 数据采集（一次完成） ====================
 def fetch_emotion():
-    """获取实时涨跌家数（多源保活）"""
-    import sys, os
-    
-    # 添加scripts目录到path
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-    
-    # === 主源：腾讯接口采样估算 ===
+    """获取实时涨跌家数（via westock-data changedist）"""
     try:
-        from get_market_sentiment import get_sentiment_legacy_format
-        sentiment = get_sentiment_legacy_format()
-        if sentiment['up'] > 0 or sentiment['down'] > 0:
-            return sentiment
+        r = subprocess.run(
+            [_NODE, _WESTOCK_SCRIPT, "changedist", "hs"],
+            capture_output=True, text=True, timeout=15
+        )
+        out = r.stdout.strip()
+        # westock 返回 Markdown 表格，提取 上涨/下跌/涨停/跌停 列（跳过平盘）
+        m = re.search(r'沪深[| ]+\S+[| ]+\S+[| ]+(\d+)[| ]+(\d+)[| ]+\d+[| ]+(\d+)[| ]+(\d+)', out)
+        if m:
+            return {
+                'up': int(m.group(1)),
+                'down': int(m.group(2)),
+                'zt': int(m.group(3)),
+                'dt': int(m.group(4))
+            }
+        # fallback: 尝试 JSON（旧版兼容）
+        data = json.loads(out)
+        if isinstance(data, dict):
+            return {
+                'up': data.get('up', 0),
+                'down': data.get('down', 0),
+                'zt': data.get('zt', 0),
+                'dt': data.get('dt', 0)
+            }
     except Exception as e:
-        print(f"腾讯接口采样失败: {e}")
-    
-    # === 备源1：legulegu.com ===
-    try:
-        import subprocess, re
-        r = subprocess.run(["curl","-s","-L","--max-time","10","-A","Mozilla/5.0",
-                           "https://legulegu.com/stockdata/market-activity"],
-                           capture_output=True, text=True, timeout=12)
-        mu = re.search(r'(\d+)家上涨', r.stdout)
-        md = re.search(r'(\d+)家下跌', r.stdout)
-        mz = re.search(r'(\d+)家涨停', r.stdout)
-        mt = re.search(r'(\d+)家跌停', r.stdout)
-        if mu and md:
-            return {'up': int(mu.group(1)), 'down': int(md.group(1)),
-                    'zt': int(mz.group(1)) if mz else 0, 'dt': int(mt.group(1)) if mt else 0}
-    except:
-        pass
-    
-    # === 备源2：新浪财经 ===
-    try:
-        ups = downs = zts = dts = 0
-        import urllib.request as _ur
-        import json as _json
-        for pg in [1, 2, 3]:
-            u = f"https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page={pg}&num=100&sort=code&asc=1&node=hs_a"
-            req = _ur.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-            with _ur.urlopen(req, timeout=8) as resp:
-                items = _json.loads(resp.read().decode('gbk'))
-            for i in items:
-                cp = float(i.get('changepercent', 0))
-                if cp > 0: ups += 1
-                elif cp < 0: downs += 1
-                if cp >= 9.8: zts += 1
-                elif cp <= -9.8: dts += 1
-            if ups + downs > 100:
-                return {'up': ups, 'down': downs, 'zt': zts, 'dt': dts, 'src': 'sina'}
-    except:
-        pass
+        print(f"⚠️ westock-data 涨跌分布获取失败: {e}", file=sys.stderr)
     return None
 
-def fetch_quotes(codes):
-    """批量获取实时行情 {code: {price, pct, vol, high, low, name}}"""
+def _code_to_exchange(code):
+    """根据股票代码推断交易所"""
+    if code.startswith('6'):
+        return 'SH'
+    elif code.startswith('0') or code.startswith('3'):
+        return 'SZ'
+    elif code.startswith('4') or code.startswith('8'):
+        return 'BJ'
+    return None
+
+def fetch_quotes_ht(codes):
+    """华泰行情API（主数据源）：并发获取 price/pct/limit_up/is_suspended，更可靠"""
     if not codes:
         return {}
-    ql = [f"sh{c}" if c.startswith('6') else f"sz{c}" for c in codes]
-    r = subprocess.run(["curl","-s","--max-time","10",f"https://qt.gtimg.cn/q={','.join(ql)}"],
-                      capture_output=True, timeout=12)
-    for enc in ["gb2312","gbk","utf-8"]:
-        try: txt = r.stdout.decode(enc); break
-        except: continue
-    else: txt = r.stdout.decode("utf-8","replace")
     quotes = {}
-    for line in txt.split(";"):
-        m = re.search(r'v_(\w+)="([^"]*)"', line)
-        if m:
-            p = m.group(2).split("~")
-            if len(p) > 37:
-                code = p[2]
-                quotes[code] = {
-                    'price': float(p[3]) if p[3] else 0,
-                    'pct': float(p[32]) if len(p) > 32 else 0,
-                    'vol': float(p[36]) if len(p) > 36 else 0,
-                    'high': float(p[33]) if len(p) > 33 else 0,
-                    'low': float(p[34]) if len(p) > 34 else 0,
-                    'name': p[1],
+
+    def _fetch_one(code):
+        exchange = _code_to_exchange(code)
+        if not exchange:
+            return code, None
+        try:
+            resp = requests.post(
+                _HT_GET_QUOTE_URL,
+                json={'stockCode': code, 'exchange': exchange},
+                headers={
+                    'apiKey': _HT_APIKEY,
+                    'Content-Type': 'application/json',
+                    'skillCode': _HT_SKILL_CODE,
+                },
+                timeout=_HT_TIMEOUT,
+            )
+            data = resp.json()
+            if data.get('ok') and data.get('data'):
+                d = data['data']
+                return code, {
+                    'price': float(d.get('currentPrice', 0)),
+                    'pct': float(d.get('change', 0)),
+                    'limit_up': float(d.get('limitUp', 0)),
+                    'limit_down': float(d.get('limitDown', 0)),
+                    'is_suspended': d.get('isSuspended', False),
                 }
+        except Exception as e:
+            print(f"⚠️ 华泰行情获取失败({code}): {e}", file=sys.stderr)
+        return code, None
+
+    with ThreadPoolExecutor(max_workers=min(len(codes), 10)) as executor:
+        futures = {executor.submit(_fetch_one, code): code for code in codes}
+        for future in as_completed(futures, timeout=_HT_TIMEOUT * 2 + 2):
+            code, result = future.result()
+            if result:
+                quotes[code] = result
+
+    return quotes
+
+def fetch_quotes(codes):
+    """获取实时行情（华泰优先 + westock兜底），返回 {code: {price, pct, vol, high, low, name, limit_up, is_suspended}}"""
+    if not codes:
+        return {}
+
+    quotes = {}
+    # 1. 华泰API优先：获取 price/pct/limit_up/is_suspended（更可靠，直接给涨停价）
+    ht_quotes = fetch_quotes_ht(codes)
+    ht_ok = len(ht_quotes)
+
+    # 2. westock-data兜底：获取 vol/high/low/name 等补充字段
+    ql = [f"sh{c}" if c.startswith('6') else f"sz{c}" for c in codes]
+    ws_ok = 0
+    try:
+        r = subprocess.run(
+            [_NODE, _WESTOCK_SCRIPT, "quote", ",".join(ql)],
+            capture_output=True, text=True, timeout=15
+        )
+        data = json.loads(r.stdout)
+        items = data if isinstance(data, list) else list(data.values()) if isinstance(data, dict) else []
+        ws_ok = len(items)
+        for item in items:
+            code_raw = item.get("code", "")
+            code = code_raw[2:] if len(code_raw) > 2 else code_raw
+            ht = ht_quotes.get(code, {})
+            ws_price = float(item.get("price", 0))
+            quotes[code] = {
+                # price/pct 优先华泰（涨停封死后不返回脏数据），华泰不可用才用westock
+                'price': ht.get('price') or ws_price,
+                'pct': ht.get('pct') if ht.get('pct') is not None else float(item.get("pctChg", 0)),
+                # 华泰专用字段
+                'limit_up': ht.get('limit_up', 0),
+                'limit_down': ht.get('limit_down', 0),
+                'is_suspended': ht.get('is_suspended', False),
+                # 补充字段（华泰不提供，走westock）
+                'vol': float(item.get("volume", 0)),
+                'high': float(item.get("high", 0)),
+                'low': float(item.get("low", 0)),
+                'name': item.get("name", ""),
+            }
+    except Exception as e:
+        print(f"⚠️ westock-data 行情获取失败: {e}", file=sys.stderr)
+        # westock也挂了，纯华泰数据
+        for code in codes:
+            ht = ht_quotes.get(code, {})
+            if ht:
+                quotes[code] = {
+                    'price': ht.get('price', 0),
+                    'pct': ht.get('pct', 0),
+                    'vol': 0, 'high': 0, 'low': 0, 'name': '',
+                    'limit_up': ht.get('limit_up', 0),
+                    'limit_down': ht.get('limit_down', 0),
+                    'is_suspended': ht.get('is_suspended', False),
+                }
+
+    # 数据源状态摘要
+    if ht_ok == 0 and ws_ok > 0:
+        print(f"⚠️ 华泰API不可用，已降级到westock-data（{ws_ok}只）")
+    elif ht_ok > 0:
+        print(f"📊 行情: 华泰{ht_ok}只 + westock{ws_ok}只")
     return quotes
 
 def fetch_kline(code, days=10):
-    """获取K线数据"""
+    """获取K线数据（via westock-data）"""
     prefix = 'sh' if code.startswith('6') else 'sz'
-    url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_dayhfq&param={prefix}{code},day,,,{days},qfq"
     try:
-        r = subprocess.run(['curl', '-s', '--max-time', '10', url], capture_output=True, timeout=12)
-        m = re.search(r'kline_dayhfq=(.*)', r.stdout.decode('utf-8', 'replace'))
-        if not m: return []
-        data = json.loads(m.group(1))
-        raw = data.get('data', {}).get(f'{prefix}{code}', {})
-        klines = raw.get('qfqday', raw.get('day', []))
-        return [{'close': float(k[2]), 'volume': int(float(k[5]))} for k in klines]
-    except:
-        return []
+        r = subprocess.run(
+            [_NODE, _WESTOCK_SCRIPT, "kline", f"{prefix}{code}", "--period", "day", "--limit", str(days)],
+            capture_output=True, text=True, timeout=15
+        )
+        data = json.loads(r.stdout)
+        klines = data if isinstance(data, list) else []
+        result = []
+        for k in klines:
+            result.append({
+                'date': k.get('date', k.get('tradeDate', '')),
+                'open': float(k.get('open', 0)),
+                'close': float(k.get('close', 0)),
+                'high': float(k.get('high', 0)),
+                'low': float(k.get('low', 0)),
+                'volume': float(k.get('volume', 0)),
+            })
+        return result
+    except Exception as e:
+        print(f"⚠️ westock-data K线获取失败({code}): {e}", file=sys.stderr)
+    return []
 
 def calc_ma(klines, period):
     if len(klines) < period: return None
@@ -285,16 +394,52 @@ def detect_sellpoints(positions, quotes):
 
         # 超短卖点（14:50后，涨停次日未封板）
         now_min = datetime.datetime.now().hour * 60 + datetime.datetime.now().minute
-        if not reason and now_min >= 50 and '1.0' in dim:
-            if q['pct'] < 7:
-                reason = f"超短卖点：涨停次日未封板(现{q['pct']:.1f}%)"
+        if not reason and now_min >= 890 and '1.0' in dim:  # 14:50=890
+            # 必须确认昨日确实涨停（涨幅≥9.5%），否则不触发
+            # 检查持仓买入后昨日涨幅：用buy_price对比昨日收盘价
+            # 简化：当前涨幅<7%且昨日涨停→未封板卖出；非涨停股不触发此规则
+            buy_date_str = pos.get('buy_date', '')
+            was_limit_up_yesterday = False
+            if buy_date_str:
+                try:
+                    # 查询昨日K线确认是否涨停（via westock-data）
+                    klines = fetch_kline(code, 5)
+                    if len(klines) >= 2:
+                        yesterday_close = klines[-2]['close']
+                        day_before_close = klines[-3]['close'] if len(klines) >= 3 else klines[-2]['open']
+                        if day_before_close > 0:
+                            yesterday_pct = (yesterday_close - day_before_close) / day_before_close * 100
+                            was_limit_up_yesterday = yesterday_pct >= 9.5
+                except:
+                    pass  # 数据获取失败则保守不触发
+            if was_limit_up_yesterday and q['pct'] < 7:
+                reason = f"超短卖点：涨停次日未封板(昨涨≥9.5%,现{q['pct']:.1f}%)"
+
+        # 分时止盈（盈利>min_profit_pct才启用，回调>callback_threshold_pct触发）
+        if not reason and pnl_pct > 0:
+            tp_cfg = _load_take_profit_config()
+            if pnl_pct >= tp_cfg.get('min_profit_pct', 5.0) and hold_days >= 1:
+                # 盈利达标，检查日内高点回落比例
+                day_high = q.get('high', q['price'])
+                if day_high > 0 and day_high > buy_price:
+                    peak_pct = (day_high - buy_price) / buy_price * 100  # 最高点盈利%
+                    callback_pct = peak_pct - pnl_pct  # 从高点回落的百分点
+                    if callback_pct >= tp_cfg.get('callback_threshold_pct', 5.0):
+                        reason = f"分时止盈：最高盈利{peak_pct:.1f}%回落{callback_pct:.1f}%≥{tp_cfg['callback_threshold_pct']}%"
 
         # 通用时间止损
         if not reason and hold_days >= MAX_HOLD_DAYS:
             reason = f"时间止损：持仓{hold_days}天 ≥ {MAX_HOLD_DAYS}天"
 
         if reason:
-            sell(code, q['price'], reason, "止损" if "止损" in reason else "止盈")
+            # sell_type: 亏损→止损, 盈利→止盈, 规则名含止损→止损
+            if '止损' in reason:
+                sell_type_val = "止损"
+            elif pnl_pct < 0:
+                sell_type_val = "止损"
+            else:
+                sell_type_val = "止盈"
+            sell(code, q['price'], reason, sell_type_val)
             triggers.append((code, name, reason, 'SELL'))
 
     return triggers
@@ -329,7 +474,7 @@ def detect_buypoints(candidates, quotes, emotion):
     if corrections:
         print(f"🔧 情绪三重校验修正: {'; '.join(corrections)}")
     
-    print(f"🎮 情绪矩阵: {up_count}涨 → 主导{dominant_dim}, 仓位上限{pos_limit}成")
+    print(f"🎮 情绪矩阵: {up_count}涨 → 主导{dominant_dim}, 仓位上限{pos_limit}%")
 
     # 极冰点保护：<800涨时不做分歧低吸（接飞刀风险极高）
     extreme_freeze = up_count < 800
@@ -340,12 +485,59 @@ def detect_buypoints(candidates, quotes, emotion):
             name = item.get('名称', item.get('name', ''))
             if not code or code not in quotes:
                 continue
-            if item.get('status') == '已买入' or item.get('locked') and '熔断' in item.get('锁定原因', ''):
+            # 盘中实时解锁3.0：盘前打熔断标签，但盘中实时进入推理区/严格解锁则自动解除锁定
+            is_30_melt = (item.get('locked') and '熔断' in item.get('锁定原因', ''))
+            # 读配置
+            cfg_30 = {}
+            try:
+                with open(CONFIG_PATH) as _f:
+                    _cfg = json.load(_f)
+                    cfg_30 = _cfg.get('3.0_emotion_rules', {})
+            except: pass
+            melt_below = cfg_30.get('melt_below', 1800)
+            infer_zone = cfg_30.get('inference_zone', {})
+            infer_low = infer_zone.get('low', 1800)
+            infer_high = infer_zone.get('high', 2500)
+            full_above = cfg_30.get('full_activate_above', 2500)
+            # 判断解锁状态
+            in_infer_zone = infer_low <= up_count <= infer_high
+            in_full_unlock = up_count > full_above
+            realtime_unlocked = is_30_melt and (in_infer_zone or in_full_unlock)
+            # 推理区四维评分（仅推理区需要）
+            inference_score = 0
+            if is_30_melt and in_infer_zone:
+                # 昨日情绪评分
+                try:
+                    _yesterday_up = json.load(open(BASE.parent / 'trading' / '系统状态.json')).get('yesterday', {}).get('up_count', 9999)
+                except: _yesterday_up = 9999
+                if _yesterday_up < 1500: inference_score += 2
+                elif _yesterday_up < 2000: inference_score += 1
+                # 修复速度评分（简化：当前up_count vs 昨日）
+                if _yesterday_up > 0:
+                    _delta = up_count - _yesterday_up
+                    if _delta >= 300: inference_score += 2
+                    elif _delta >= 200: inference_score += 1
+                # 板块强度（涨停家数）
+                if emotion and emotion.get('zt', 0) > 50: inference_score += 1
+                # 量能确认：暂不评分（无盘中成交额对比数据源）
+                # TODO: 接入Level-2逐笔成交额或分钟级K线后补充
+            infer_passed = (not is_30_melt) or (realtime_unlocked and inference_score >= 3)
+            if item.get('status') == '已买入' or (is_30_melt and not infer_passed):
                 continue
 
             q = quotes[code]
-            # 涨停错过→移出
-            if q['pct'] >= 9.8:
+
+            # 停牌检测（华泰API提供，westock无此字段）
+            if q.get('is_suspended'):
+                continue
+
+            # 涨停封死→跳过（优先用limitUp判断，更可靠；兜底用pct）
+            limit_up = q.get('limit_up', 0)
+            if limit_up > 0:
+                if q['price'] >= limit_up * 0.999:  # 允许0.1%浮动容差
+                    item['status'] = '涨停错过'
+                    continue
+            elif q['pct'] >= 9.8:
                 item['status'] = '涨停错过'
                 continue
 
@@ -356,7 +548,7 @@ def detect_buypoints(candidates, quotes, emotion):
             elif dim == '2.0板块卡位':
                 reason = _check_sector_leader(code, name, item, q)
             elif dim == '3.0趋势低吸':
-                reason = _check_trend_low(code, name, quotes, q, up_count, item)
+                reason = _check_trend_low(code, name, quotes, q, up_count, item, realtime_unlocked)
 
             if reason:
                 # 极冰点保护
@@ -364,12 +556,17 @@ def detect_buypoints(candidates, quotes, emotion):
                     reason = f"[极冰点跳过] {reason}"
                     continue
                 # 情绪维度过滤：非主导维度不盘中买入
+                # 推理区解锁的3.0绕过维度过滤
                 dim_prefix = dim.split('-')[0]
-                if dominant_dim not in ('辅助', dim_prefix) and dim_prefix not in dominant_dim.split('+'):
-                    continue
+                if not (dim == '3.0趋势低吸' and realtime_unlocked):
+                    if dominant_dim not in ('辅助', dim_prefix) and dim_prefix not in dominant_dim.split('+'):
+                        continue
                 # 动态仓位
                 base_pct = BASE_POSITION_PCT.get(dim, 10)
                 adj_pct = adjust_position_pct(base_pct, pos_limit, len(positions))
+                # 推理区解锁的3.0仓位减半
+                if dim == '3.0趋势低吸' and realtime_unlocked and in_infer_zone:
+                    adj_pct = adj_pct / 2
                 if adj_pct <= 0:
                     continue
                 sector = item.get('sector', item.get('板块', item.get('track', item.get('产业逻辑', ''))))
@@ -416,22 +613,20 @@ def _check_sector_leader(code, name, item, q):
     # 简化：竞价未通过的不追高，等下次竞价
     return None
 
-def _check_trend_low(code, name, quotes, q, up_count, item):
+def _check_trend_low(code, name, quotes, q, up_count, item, realtime_unlocked=False):
     """3.0趋势低吸：回踩均线"""
     locked = item.get('locked', False)
-    if locked and '熔断' in item.get('锁定原因', ''):
-        return None  # 冰点熔断
+    melt_locked = locked and '熔断' in item.get('锁定原因', '')
+    # 使用detect_buypoints传入的realtime_unlocked（已按配置计算）
+    if melt_locked and not realtime_unlocked:
+        return None  # 冰点熔断（盘中未修复）
     klines = fetch_kline(code, 12)
     ma5 = calc_ma(klines, 5)
     if not ma5:
         return None
     if q['price'] < ma5 * 0.98:
         return f"跌破MA5({ma5:.2f})"
-    if locked:
-        return None  # 等待激活
-    if up_count < 2500:
-        return None  # 未达到激活条件
-    return f"趋势低吸：回踩MA5({ma5:.2f})不破 + 情绪{up_count}"
+    return f"趋势低吸：回踩MA5({ma5:.2f})不破 + 情绪{up_count}（盘中解锁）"
 
 # ==================== 尾盘专项 ====================
 def late_session_check(emotion, quotes, positions):
@@ -453,17 +648,23 @@ def late_session_check(emotion, quotes, positions):
     if up < 1500:
         outputs.append("🚨 冰点→建议清仓非1.0持仓")
     elif up > 3500:
-        outputs.append("🔴 极度高潮→辅助模式，仓位上限2成")
+        outputs.append("🔴 极度高潮→辅助模式，仓位上限20%")
 
-    # 涨停池快查
+    # 涨停池快查（via westock-data lhb）
     try:
-        import akshare as ak
-        today = datetime.date.today().strftime("%Y%m%d")
-        df = ak.stock_zt_pool_em(date=today)
-        if len(df) > 0:
-            sectors = Counter(df.get('所属行业', df.get('板块', [])).tolist())
+        r = subprocess.run(
+            [_NODE, _WESTOCK_SCRIPT, "lhb"],
+            capture_output=True, text=True, timeout=15
+        )
+        lhb_data = json.loads(r.stdout)
+        if isinstance(lhb_data, list) and len(lhb_data) > 0:
+            # 从龙虎榜统计板块分布
+            sectors = Counter(
+                item.get('sector', item.get('industry', '其他'))
+                for item in lhb_data
+            )
             top3 = sectors.most_common(3)
-            outputs.append(f"🔥 今日涨停: {len(df)}只 | {' | '.join(f'{s}:{c}只' for s, c in top3)}")
+            outputs.append(f"🔥 龙虎榜: {len(lhb_data)}只 | {' | '.join(f'{s}:{c}只' for s, c in top3)}")
     except:
         pass
 
@@ -555,7 +756,7 @@ def run():
 
     # 7. 保存买点通知
     if buy_triggers:
-        notify_path = f"/tmp/lobster_buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt"
+        notify_path = str(BASE.parent / "trading" / f"buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt")
         with open(notify_path, 'w') as f:
             f.write('\n'.join([f"🔥 {name}({code}): {reason}" for code, name, reason, _ in buy_triggers]))
         print(f"\n✅ 通知已保存: {notify_path}")

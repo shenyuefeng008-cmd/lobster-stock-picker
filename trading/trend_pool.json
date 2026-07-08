@@ -1,0 +1,100 @@
+{
+  "date": "2026-07-07",
+  "market_summary": {
+    "shanghai": 3999.03,
+    "shanghai_chg": -1.26,
+    "shenzhen": 15259.20,
+    "shenzhen_chg": -1.24,
+    "chinext": 3918.22,
+    "chinext_chg": -0.94,
+    "star50": 2009.24,
+    "star50_chg": 0.28,
+    "volume_billion": 2598.5,
+    "up_count": 762,
+    "down_count": 4717,
+    "sentiment": "extreme_ice"
+  },
+  "strong": [
+    {
+      "code": "603137",
+      "name": "恒尚节能",
+      "reason": "6连板全场最高，封单6.3亿≥1亿，建筑装饰方向，连板梯队断层后仍保持高度",
+      "board_height": 6,
+      "seal_amount_billion": 6.3,
+      "sector": "建筑装饰"
+    }
+  ],
+  "watch": [
+    {
+      "code": "002185",
+      "name": "华天科技",
+      "reason": "首板，封单21.2亿(全场最强)，半导体封测龙头，赛道强势",
+      "board_height": 1,
+      "seal_amount_billion": 21.2,
+      "sector": "半导体"
+    },
+    {
+      "code": "600206",
+      "name": "有研新材",
+      "reason": "首板，封单8.0亿，半导体靶材+大基金增资+业绩增长79%",
+      "board_height": 1,
+      "seal_amount_billion": 8.0,
+      "sector": "半导体"
+    },
+    {
+      "code": "603893",
+      "name": "瑞芯微",
+      "reason": "首板，封单6.4亿，芯片设计龙头，半导体主线",
+      "board_height": 1,
+      "seal_amount_billion": 6.4,
+      "sector": "半导体"
+    },
+    {
+      "code": "002497",
+      "name": "雅化集团",
+      "reason": "首板一字，封单7.6亿，半年净利预增710-857%，锂盐量价齐升",
+      "board_height": 1,
+      "seal_amount_billion": 7.6,
+      "sector": "锂电"
+    },
+    {
+      "code": "688261",
+      "name": "东微半导",
+      "reason": "首板(20cm)，封单可观，业绩修复(扣非+240%)，车规/工业级占比83%",
+      "board_height": 1,
+      "seal_amount_billion": 1.5,
+      "sector": "半导体"
+    },
+    {
+      "code": "600206",
+      "name": "有研硅",
+      "reason": "首板(20cm)，半导体硅片材料，扩产受益",
+      "board_height": 1,
+      "seal_amount_billion": 3.5,
+      "sector": "半导体"
+    },
+    {
+      "code": "002841",
+      "name": "视源股份",
+      "reason": "首板一字，封单7.4亿，智能交互显示龙头",
+      "board_height": 1,
+      "seal_amount_billion": 7.4,
+      "sector": "消费电子"
+    },
+    {
+      "code": "002129",
+      "name": "TCL中环",
+      "reason": "首板，半导体硅片+光伏双主线，低位反弹",
+      "board_height": 1,
+      "seal_amount_billion": 2.1,
+      "sector": "半导体"
+    }
+  ],
+  "eliminated": [],
+  "notes": {
+    "data_source": "午间复盘(11:31) + web_search收盘快报",
+    "board_break_info": "收盘未获取炸板明细，盘中部分涨停股（如巨人网络）开板回落",
+    "close_warning": "恒尚节能虽6连板但所属赛道非当日主线(半导体)，需关注明日是否断板；宜宾纸业5连板但封单仅0.95亿<1亿，未入强势池",
+    "next_session_focus": "华天科技封单21亿是否延续；半导体方向能否接力成为新主线；4000点能否收复"
+  }
+}

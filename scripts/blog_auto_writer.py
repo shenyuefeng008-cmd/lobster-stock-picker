@@ -9,6 +9,7 @@ import sys, json, subprocess, re, os, datetime
 from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parent.parent
+TRADING = WORKSPACE / "trading"
 BLOG_HTML = WORKSPACE / "blog" / "index.html"
 
 # ─── 交易日判断 ───────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ def is_trading_day(d=None):
         return False
     return True
 
-# ─── 读取 /tmp 数据 ───────────────────────────────────────────────────────────
+# ─── 读取 trading 数据 ───────────────────────────────────────────────────────────
 def load_json(path):
     try:
         with open(path) as f:
@@ -141,16 +142,16 @@ def build_midday_article():
     if up is not None:
         if up < 1500:
             sentiment = f"冰点区（{up}涨/{down}跌）"
-            dim = "1.0主导，仓位上限5成"
+            dim = "1.0主导，仓位上限30%"
         elif up < 2500:
             sentiment = f"弱势区（{up}涨/{down}跌）"
-            dim = "1.0+3.0，总仓位上限9成"
+            dim = "1.0+3.0，总仓位上限90%"
         elif up < 3500:
             sentiment = f"正常区（{up}涨/{down}跌）"
-            dim = "2.0+1.0，仓位5-7成"
+            dim = "2.0+1.0，仓位50-70%"
         else:
             sentiment = f"高潮区（{up}涨/{down}跌）"
-            dim = "辅助模式，仓位1-2成"
+            dim = "辅助模式，仓位10-20%"
     else:
         sentiment = "数据获取失败"
         dim = "未知"
@@ -199,9 +200,9 @@ def build_closing_article():
     indices = get_index_prices()
 
     # 读取模拟仓状态
-    sim_state = load_json('/tmp/lobster_sim_state.json') or {}
+    sim_state = load_json(str(TRADING / 'sim_state.json')) or {}
     positions = sim_state.get('positions', [])
-    trading_log = load_json('/tmp/lobster_trading_log.json') or []
+    trading_log = load_json(str(TRADING / 'trading_log.json')) or []
     
     # 如果没有trading_log，尝试从sim_state构建
     if not trading_log and positions:
@@ -218,7 +219,7 @@ def build_closing_article():
             })
 
     # 读取盘前候选今日表现（支持新旧两种格式）
-    raw_premarket = load_json('/tmp/lobster_premarket_candidates.json')
+    raw_premarket = load_json(str(TRADING / 'premarket_candidates.json'))
     if isinstance(raw_premarket, dict) and 'candidates' in raw_premarket:
         # 新格式：{candidates: {维度1: [{名称,代码,...}], ...}}
         premarket = []
@@ -231,7 +232,7 @@ def build_closing_article():
         premarket = raw_premarket
     else:
         premarket = []
-    bid_result = load_json('/tmp/lobster_bid_result.json')
+    bid_result = load_json(str(TRADING / 'bid_result.json'))
 
     body = f"""<blockquote>收盘复盘：全天市场总结、选股验证、模拟仓表现、经验教训。</blockquote>
 
@@ -242,19 +243,19 @@ def build_closing_article():
         if up < 1500:
             sentiment = "冰点"
             color = "box-r"
-            dim = "1.0主导，仓位上限5成"
+            dim = "1.0主导，仓位上限30%"
         elif up < 2500:
             sentiment = "弱势"
             color = "box-b"
-            dim = "1.0+3.0，总仓位上限9成"
+            dim = "1.0+3.0，总仓位上限90%"
         elif up < 3500:
             sentiment = "正常"
             color = "box-b"
-            dim = "2.0+1.0，仓位5-7成"
+            dim = "2.0+1.0，仓位50-70%"
         else:
             sentiment = "极度高潮"
             color = "box-g"
-            dim = "辅助模式，仓位1-2成"
+            dim = "辅助模式，仓位10-20%"
         
         body += f"""<div class="{color}">
 <strong>涨跌家数：</strong>上涨 {up} 家，下跌 {down} 家<br>

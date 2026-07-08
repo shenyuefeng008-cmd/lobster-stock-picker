@@ -9,8 +9,8 @@ import urllib.request, re, json, os, sys, time, datetime, signal
 
 WS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAP_DIR = f"{WS}/trading/five_level_snapshots"
-CANDIDATES_FILE = "/tmp/lobster_bid_result.json"
-PREMARKET_FILE = "/tmp/lobster_premarket_candidates.json"
+CANDIDATES_FILE = f"{WS}/trading/bid_result.json"
+PREMARKET_FILE = f"{WS}/trading/premarket_candidates.json"
 os.makedirs(SNAP_DIR, exist_ok=True)
 
 # 采集间隔（秒）

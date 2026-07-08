@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+cron_logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sensitive / private
+.wechat_token.json
+.openclaw/
+.consolidate-state.json
+.qclaw-version
+
+# Task state files
+.task-*.md
+
+# Temp / artifacts
+task-artifacts/
+
+# Memory (private)
+memory/
+
+# Generated / junk files
+temp/
+feedback*.json
+*%pnl*

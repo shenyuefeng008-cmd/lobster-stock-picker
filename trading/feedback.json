@@ -3,7 +3,7 @@
     "description": "全系统反馈数据 — 自动进化调参",
     "version": "2.0",
     "created": "2026-05-24",
-    "last_updated": "2026-05-30"
+    "last_updated": "2026-07-03"
   },
   "L1_emotion": {
     "records": [
@@ -56,20 +56,152 @@
         "early_up": 2115,
         "early_emo": "✅正常→1.0+3.0",
         "pos_limit": 3
+      },
+      {
+        "date": "2026-06-02",
+        "time": "15:06",
+        "actual_up": 1373,
+        "actual_down": 3742,
+        "actual_emo": "偏弱",
+        "actual_dim": "1.0",
+        "early_up": 1060,
+        "early_emo": "🚨冰点→1.0主导",
+        "pos_limit": 3
+      },
+      {
+        "date": "2026-06-03",
+        "time": "15:06",
+        "actual_up": 1644,
+        "actual_down": 3484,
+        "actual_emo": "正常",
+        "actual_dim": "1.0+3.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 5
+      },
+      {
+        "date": "2026-06-04",
+        "time": "15:06",
+        "actual_up": 1294,
+        "actual_down": 3855,
+        "actual_emo": "偏弱",
+        "actual_dim": "1.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 3
+      },
+      {
+        "date": "2026-06-10",
+        "time": "15:06",
+        "actual_up": 1519,
+        "actual_down": 3602,
+        "actual_emo": "正常",
+        "actual_dim": "1.0+3.0",
+        "early_up": 1213,
+        "early_emo": "🚨冰点→1.0主导",
+        "pos_limit": 50
+      },
+      {
+        "date": "2026-06-12",
+        "time": "15:06",
+        "actual_up": 3708,
+        "actual_down": 1413,
+        "actual_emo": "极度高潮",
+        "actual_dim": "辅助",
+        "early_up": 3506,
+        "early_emo": "🔴极度高潮→辅助",
+        "pos_limit": 2
+      },
+      {
+        "date": "2026-06-22",
+        "time": "15:06",
+        "actual_up": 2691,
+        "actual_down": 2376,
+        "actual_emo": "高潮",
+        "actual_dim": "2.0+1.0",
+        "early_up": 1160,
+        "early_emo": "🚨冰点→1.0主导",
+        "pos_limit": 7
+      },
+      {
+        "date": "2026-06-23",
+        "time": "15:06",
+        "actual_up": 2549,
+        "actual_down": 2548,
+        "actual_emo": "高潮",
+        "actual_dim": "2.0+1.0",
+        "early_up": 3370,
+        "early_emo": "🔥高潮→2.0+1.0",
+        "pos_limit": 7
+      },
+      {
+        "date": "2026-06-24",
+        "time": "15:06",
+        "actual_up": 1381,
+        "actual_down": 3768,
+        "actual_emo": "偏弱",
+        "actual_dim": "1.0",
+        "early_up": 1096,
+        "early_emo": "🚨冰点→1.0主导",
+        "pos_limit": 3
+      },
+      {
+        "date": "2026-06-30",
+        "time": "19:04",
+        "actual_up": 2902,
+        "actual_down": 2200,
+        "actual_emo": "高潮",
+        "actual_dim": "2.0+1.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 7
+      },
+      {
+        "date": "2026-07-01",
+        "time": "10:22",
+        "actual_up": 3435,
+        "actual_down": 1661,
+        "actual_emo": "高潮",
+        "actual_dim": "2.0+1.0",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 7
+      },
+      {
+        "date": "2026-07-01",
+        "time": "10:39",
+        "actual_up": 3738,
+        "actual_down": 1395,
+        "actual_emo": "极度高潮",
+        "actual_dim": "辅助",
+        "early_up": null,
+        "early_emo": null,
+        "pos_limit": 2
+      },
+      {
+        "date": "2026-07-02",
+        "time": "09:28",
+        "actual_up": 4043,
+        "actual_down": 1110,
+        "actual_emo": "极度高潮",
+        "actual_dim": "辅助",
+        "early_up": 4043,
+        "early_emo": "🔴极度高潮→辅助",
+        "pos_limit": 2
       }
     ],
     "stats": {
-      "total_predictions": 5,
-      "last_updated": "2026-05-30"
+      "total_predictions": 17,
+      "last_updated": "2026-07-03"
     },
     "parameter_adjustments": []
   },
   "L2_catalyst": {
     "records": [],
     "stats": {
-      "total_scored": 8,
-      "verified_count": 1,
-      "correct": 1
+      "total_scored": 10,
+      "verified_count": 10,
+      "correct": 2
     },
     "weight_adjustments": []
   },
@@ -83,32 +215,96 @@
   "L4_execution": {
     "records": [],
     "stats": {
-      "total_trades": 10,
+      "total_trades": 28,
       "veto_reasons": {
         "1.0硬止损触发": 1,
-        "1.0分歧低吸硬止损：回撤-7.00% ≤ -5%": 1
+        "1.0分歧低吸硬止损：回撤-7.00% ≤ -5%": 1,
+        "1.0时间止损：持仓3天未涨停": 1,
+        "3.0趋势低吸硬止损：回撤-3.39% ≤ -3%": 1,
+        "1.0-一进二硬止损：回撤-13.79% ≤ -5%": 1,
+        "1.0分歧低吸硬止损：回撤-7.23% ≤ -7%": 1,
+        "时间止损：持仓5天 ≥ 5天": 1,
+        "1.0时间止损:持仓3天未涨停": 1,
+        "时间止损:持仓12天 ≥ 5天": 1,
+        "时间止损:持仓7天 ≥ 5天": 1,
+        "时间止损:持仓5天 ≥ 5天": 1,
+        "3.0趋势低吸硬止损:回撤-3.13% ≤ -3%": 1,
+        "冰点减仓：涨跌家数75<1500": 1,
+        "极度高潮清仓：涨跌家数4257>3500": 3
       }
     }
   },
   "parameter_evolution": {
-    "last_adjustment": "2026-05-30",
-    "config_version": "1.9",
-    "adjustment_history": [
-      {
-        "date": "2026-05-30",
-        "applied": [
-          {
-            "target": "2.0板块卡位.score",
-            "action": " 15→18 (收紧评分门槛)",
-            "applied": true
-          }
-        ]
-      }
-    ],
+    "last_adjustment": "2026-07-03",
+    "config_version": "3.0",
+    "adjustment_history": [],
     "performance_baseline": {
-      "win_rate": 60.0,
-      "avg_pnl_pct": 0.38,
-      "total_closed_trades": 10
+      "win_rate": 60.7,
+      "avg_pnl_pct": 4.43,
+      "total_closed_trades": 28
+    },
+    "date": "2026-07-05",
+    "version": "3.0",
+    "changes": {
+      "ice_threshold": {
+        "current": 1600,
+        "new": 1600,
+        "note": "保持<1600不变；新增early冰点午间量能修正规则"
+      },
+      "early_ice_override": {
+        "rule": "early_emo=冰点 且 午间量能>80%基准量 → 不冻结，仓位减半",
+        "trigger_count": 5,
+        "false_positive_rate": 0.8
+      },
+      "position_limits": {
+        "current": {
+          "ice": 0.3,
+          "repair": 0.4,
+          "weak": 0.7,
+          "sector": 0.7,
+          "extreme": 0.2
+        },
+        "new_additions": {
+          "mainline_strong_3day_min": 0.3
+        }
+      },
+      "stop_loss": {
+        "strategy_1_0_one_to_two": {
+          "current": -0.05,
+          "new": -0.05,
+          "note": "保持；新增日内-7%强制止损"
+        },
+        "strategy_1_0_dip": {
+          "current": -0.06,
+          "new": -0.06
+        },
+        "strategy_3_0_trend": {
+          "current_config": -0.04,
+          "actual_l4": -0.03,
+          "action": "修复代码读取config"
+        },
+        "cooldown": {
+          "new": "止损后30分钟内禁止同板块开仓"
+        }
+      },
+      "stock_selection": {
+        "ban_height": {
+          "current": "无上限",
+          "new": "2-3板优先；4板+仅主线确认时参与"
+        },
+        "market_cap": {
+          "current": "20-200亿",
+          "new": "20-200亿；主线强势时放宽至300亿"
+        },
+        "sector_concentration": {
+          "current": "无约束",
+          "new": "主线强3天→上限60%；普通行情→≤30%"
+        },
+        "catalyst_filter": {
+          "current": "无量化",
+          "new": "web_search交叉验证 + 营收占比>5%"
+        }
+      }
     }
   }
 }

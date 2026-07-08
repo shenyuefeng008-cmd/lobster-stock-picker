@@ -4,7 +4,7 @@
 在盘前引擎完成后运行：读取盘前candidates的score_detail → 追加到 score_history.json
 
 数据流：
-  盘前引擎(07:00) → 写 /tmp/lobster_premarket_candidates.json (含 score_detail)
+  盘前引擎(07:00) → 写 trading/premarket_candidates.json (含 score_detail)
   本脚本读该文件 → 追加到 trading/score_history.json（按 date+code 去重）
   进化分析器(00:10) → 读 score_history.json + 模拟持仓 → 算分项PnL → 调权重
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HISTORY_PATH = ROOT / "trading" / "score_history.json"
-INPUT_PATH = "/tmp/lobster_premarket_candidates.json"
+INPUT_PATH = str(ROOT / "trading" / "premarket_candidates.json")
 
 def load_history():
     if HISTORY_PATH.exists():

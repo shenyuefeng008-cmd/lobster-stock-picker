@@ -2,10 +2,11 @@
 龙虾自动交易决策引擎
 根据规则自动判断买卖时机
 """
-import json, subprocess, re, datetime, sys
+import json, subprocess, re, datetime, sys, time
 from pathlib import Path
 
 BASE = Path(__file__).parent
+ROOT = BASE.parent
 CONFIG_FILE = Path(__file__).parent.parent / "lobster-config.json"
 
 def load_config():
@@ -37,18 +38,41 @@ def get_realtime_quotes(codes):
     return quotes
 
 def get_market_data():
-    """获取市场情绪数据"""
-    # 涨跌家数
-    r = subprocess.run(["curl","-s","-L","--max-time","10","-A","Mozilla/5.0","https://legulegu.com/stockdata/market-activity"], capture_output=True, text=True, timeout=12)
-    m = re.search(r'content="(2026-[^"]+)"', r.stdout)
-    emo_text = m.group(1) if m else ""
-    
-    mu = re.search(r'(\d+)家上涨', emo_text)
-    md = re.search(r'(\d+)家下跌', emo_text)
-    up = int(mu.group(1)) if mu else 0
-    down = int(md.group(1)) if md else 0
-    
-    return {"up": up, "down": down, "total": up + down}
+    """获取市场情绪数据（主动采集+缓存+兜底）"""
+    sent_file = ROOT / 'trading' / 'sentiment_cache.json'
+    CACHE_TTL = 1800  # 30分钟
+
+    # 0. 检查缓存是否有效，无效则主动采集
+    cache_fresh = False
+    if sent_file.exists():
+        try:
+            with open(sent_file) as f:
+                sent = json.load(f)
+            age = time.time() - sent.get('timestamp', 0)
+            if age < CACHE_TTL and sent.get('up', 0) > 0:
+                cache_fresh = True
+        except Exception:
+            pass
+
+    if not cache_fresh:
+        try:
+            from get_market_sentiment import get_market_sentiment
+            get_market_sentiment(use_cache=False)
+        except Exception:
+            pass
+
+    # 1. 从缓存读取
+    try:
+        with open(sent_file) as f:
+            sent = json.load(f)
+        up = sent.get('up', 0)
+        down = sent.get('down', 0)
+        if up > 0:
+            return {"up": up, "down": down, "total": up + down}
+    except Exception:
+        pass
+    # 兜底：默认中性情绪
+    return {"up": 2500, "down": 2000, "total": 4500}
 
 def get_position_limits(up_count):
     """根据情绪返回仓位上限和主导维度"""
@@ -185,10 +209,10 @@ def make_decision():
     # 1. 获取市场情绪
     market = get_market_data()
     limits = get_position_limits(market["up"])
-    print(f"\n📊 情绪: {market['up']}家上涨 → {limits['dimension']}主导，仓位上限{limits['limit']}成")
+    print(f"\n📊 情绪: {market['up']}家上涨 → {limits['dimension']}主导，仓位上限{limits['limit']}%")
     
     # 2. 读取候选股
-    candidates_file = Path("/tmp/lobster_premarket_candidates.json")
+    candidates_file = ROOT / "trading" / "premarket_candidates.json"
     if not candidates_file.exists():
         print("⚠️ 无候选股文件")
         return
@@ -244,6 +268,10 @@ def auto_execute(decisions):
     import sys
     sys.path.insert(0, str(BASE))
     from simulated_trading import buy, sell, sell_partial, _load
+    
+    # 防御：无决策结果直接返回
+    if decisions is None:
+        return "无决策结果，跳过自动执行"
     
     # 检查交易时段
     from simulated_trading import is_trading_hours

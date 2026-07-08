@@ -1,62 +1,280 @@
-# TOOLS.md - 数据源速查 & 常用命令
+# TOOLS.md - 分析师工具指南
 
-## 实时数据（交易日 9:15-15:00）
+## ⚠️ 技能依赖声明
 
-### 指数行情
+本文件记录的是分析师 Agent **设计时** 期望使用的工具和工作流。但实际调用规则如下：
+
+- **只有出现在 system prompt `<available_skills>` 列表中的 skill 才可以调用**
+- 未出现在可用列表的 skill 不可调用，不可假设其存在
+- 数据取不到时，用搜索工具（如 online-search）作为替代，并标注数据来源和非实时性
+- 用户如需完整股票分析能力，可安装对应 skill
+
+---
+
+## 🧭 三层架构（设计参考）
+
+```
+                    用户提问
+                       ↓
+              意图识别（主路由）
+                       ↓
+        ┌──── 分析子工作流 ────┐
+        ↓                       ↓
+   morning-note / idea-generation /
+   sector-overview / earnings-* /
+   catalyst-calendar / thesis-tracker
+        ↓
+   分析主控（equity-analyst）协调复杂场景
+        ↓
+        └────── 数据底座 ──────┘
+                       ↓
+   neodata-financial-search ←→ westock-data
+        （自然语言搜索）       （结构化字段）
+                       ↓
+              搜索工具（兜底）
+```
+
+---
+
+## 📊 数据底座
+
+### neodata-financial-search（设计时默认首选）
+
+**触发场景：** 任何金融数据查询第一步。
+
+**覆盖：**
+- 股票（A 股 / 港股 / 美股）实时行情、历史 K 线、财报
+- 指数、板块、ETF / 公募基金（境内）
+- 宏观（GDP、CPI、PMI、利率、汇率）
+- 外汇、贵金属、大宗商品
+
+**已知限制：**
+- 公募基金主要覆盖境内基金，**不覆盖香港基金**
+- 板块/指数基础数据、板块资金和估值**主要覆盖 A 股**
+- 龙虎榜、融资融券、估值/同行对比**偏 A 股**
+- 商品/贵金属以行情为主
+
+### westock-data
+
+**触发场景：** neodata 不覆盖、需要更精确字段、需要跨市场批量对比。
+
+**代码格式：**
+- 沪市：`sh600519` / 深市：`sz000001` / 北交所：`bj430090`
+- 港股：`hk00700`
+- 美股：`usAAPL`
+
+**常用命令速查：**
+
 ```bash
-curl -s "https://qt.gtimg.cn/q=sh000001,sz399001,sz399006" | iconv -f gb2312 -t utf-8
+# —— 行情 ——
+westock-data search 腾讯控股                         # 搜索
+westock-data quote sh600519                          # 实时行情
+westock-data kline sh600519 --period day --limit 20  # K线
+westock-data minute sh600519                         # 分时
+
+# —— 基本面 ——
+westock-data finance sh600519 --num 4                # 财务报表（最近4期）
+westock-data profile sh600519                        # 公司简况
+westock-data shareholder sh600519                    # 股东结构（A股/港股）
+westock-data dividend sh600519                       # 分红
+westock-data reserve sh600519                        # 业绩预告
+
+# —— 资金 ——
+westock-data asfund sh600519                         # A股资金流向
+westock-data hkfund hk00700                          # 港股资金
+westock-data usfund usAAPL                           # 美股卖空
+westock-data lhb sz000001                            # 龙虎榜（仅A股）
+westock-data blocktrade sz000001                     # 大宗交易（仅沪深）
+westock-data margintrade sz000001                    # 融资融券（仅沪深）
+
+# —— 技术 ——
+westock-data technical sh600519 --group macd         # 技术指标
+westock-data chip sh600519                           # 筹码（仅A股）
+
+# —— ETF ——
+westock-data etf sh510300                            # ETF详情
+westock-data etf-holdings sh510300                   # ETF持仓
+
+# —— 板块/事件/宏观 ——
+westock-data hot stock                               # 热搜股票
+westock-data sector --search 华为                    # 搜索板块/概念
+westock-data calendar 2026-06-04                     # 投资日历
+westock-data ipo hs                                  # 新股日历
+westock-data suspension hs                           # 停复牌
+westock-data macro --indicator gdp --year 2025       # 宏观
 ```
-字段：`v_name`~`v_code`~`v_last_close`~`v_price`~`v_change`...`v_amount`
 
-### 涨跌家数
-```bash
-curl -sL --max-time 15 -A "Mozilla/5.0" "https://legulegu.com/stockdata/market-activity"
-# 从 content="2026-XX-XX 上涨:XXXX 下跌:XXXX..." 提取
+**已知限制：**
+- 龙虎榜/大宗交易/融资融券：**仅沪深**
+- 筹码成本：**仅沪深京 A 股**
+- 股东结构：**仅 A 股和港股**
+- 港股/美股：**禁止用 ¥ 符号**，必须用 HKD / USD
+- `search` / `minute`：**不支持批量**
+
+### 搜索工具（第三优先 · 兜底）
+
+当两个数据 skill 都不覆盖或未安装时使用，并明确告知数据来源与非实时性。
+
+---
+
+## 🎯 分析子工作流路由表（设计参考）
+
+### 何时用 morning-note
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 早报 / 综述 / 市场动态 | "今天市场怎么样"、"早盘综述"、"隔夜美股" |
+
+**输出：** 隔夜外盘要点 + 今日热点板块 + 重点事件 + Top 异动股
+
+### 何时用 idea-generation
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 推荐 / 筛选 / 找标的 | "推几只 AI 票"、"找低估值蓝筹"、"筛选高 ROE" |
+
+**输出：** 5–10 个候选 + 筛选逻辑 + 一页纸亮点 + 风险
+
+### 何时用 sector-overview
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 板块 / 行业 / 主题 | "新能源板块怎么样"、"AI 还能上车吗"、"医药行情" |
+
+**输出：** 市场规模 + 竞争格局 + 估值水位 + 关键标的 + 主题机会
+
+### 何时用 earnings-preview
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 财报前 / 业绩预演 | "腾讯下周财报怎么看"、"业绩预期"、"下季度怎么看" |
+
+**输出：** 一致预期 + 关键看点 + 牛/中/熊三档情景
+
+### 何时用 earnings-analysis
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 财报后 / 业绩解读 | "宁德这份业绩好不好"、"Beat/Miss"、"财报解读" |
+
+**输出：** 关键科目对比 + Beat/Miss 判定 + 后续展望 + 估值更新
+
+### 何时用 catalyst-calendar
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 日历 / 事件 / 重要日期 | "下周有啥重要事件"、"什么时候出业绩"、"分红日" |
+
+**输出：** 时间表（财报日 / 分红 / 解禁 / 监管 / 宏观会议）
+
+### 何时用 thesis-tracker
+
+| 触发关键词 | 用户可能说的话 |
+|---|---|
+| 持仓 / 跟踪 / 还能拿吗 | "我手里 XX 还能拿吗"、"逻辑还成立吗"、"持仓复盘" |
+
+**输出：** 投资逻辑 scorecard + 数据点更新 + 行动建议
+
+### 何时用 equity-analyst（主控）
+
+**触发场景：** 复杂综合问题，单一子工作流无法覆盖。
+
+| 用户可能说的话 |
+|---|
+| "帮我分析一下贵州茅台"、"全面看看腾讯"、"这只票怎么样" |
+
+**作用：** 协调多个子工作流 + 数据底座，输出综合分析。
+
+---
+
+## 🔄 Skill 调用流程
+
+```
+1. 识别意图：判断属于"资讯/行情"、"分析/决策"还是"跟踪/规划"
+2. 检查可用 skill：只调用 <available_skills> 中存在的 skill
+3. 数据取数：
+   - 默认先调 neodata-financial-search（如已安装）
+   - 字段不够 / 不在覆盖范围 → 切 westock-data（如已安装）
+   - 都查不到或未安装 → 搜索工具兜底（标注非实时）
+4. 按 skill 模板组织输出（中文表头、数据 + 判断 + 风险）
+5. 末尾附免责声明
 ```
 
-### 个股实时
-```bash
-curl -s "https://qt.gtimg.cn/q=sz002245,sh600578" | iconv -f gb2312 -t utf-8
+---
+
+## 📋 数据口径与标的核对（强制步骤）
+
+### 1. 标的身份核对（必做）
+
+收到股票名时，先确认：
+
+- **A 股 vs 港股 vs 美股 ADR**：腾讯港股 `hk00700` ≠ 腾讯 ADR `usTCEHY`
+- **同名公司**：先确认上市主体（如"中国电信"在 A 股 / 港股 / ADR 三地都有）
+- **ETF vs 个股**：港股 `7709.HK` 这类代码可能是 ETF / 杠杆产品 / 牛熊证
+
+### 2. 财年口径统一
+
+跨公司比较收入、利润、估值倍数前必须确认在同一期口径：
+
+- 腾讯：自然年，FY2025 = 2025-01-01 至 2025-12-31
+- 阿里：4 月制财年，FY2026 = 2025-04-01 至 2026-03-31
+- 美股：以 10-K 财年为准，部分公司非自然年
+
+### 3. 财务数据时效性
+
+按当前日期判断"此刻能拿到的最新一期财报"：
+
+| 市场 | 一季报 | 中报 | 三季报 | 年报 |
+|---|---|---|---|---|
+| A 股 | 4 月底前 | 8 月底前 | 10 月底前 | 次年 4 月底前 |
+| 港股 | — | 9 月底前 | — | 次年 3 月底前 |
+| 美股 | 10-Q（财季后 40-45 天） | — | — | 10-K（财年后 60-90 天） |
+
+**核心逻辑：** 先确认能拿到的最新报告期，再取数。
+
+---
+
+## 🎨 输出格式规范
+
+### 通用规则
+
+- 用 **markdown 表格 + 中文表头** 呈现结构化数据
+- 涨跌色彩：A 股遵循中国习惯（**涨红跌绿**），美股按用户偏好
+- 币种符号：A 股 `¥`、港股 `HKD`、美股 `USD`，**禁止混用**
+- 数据来源 + 报告期次必须标注
+
+### 各场景输出模板
+
+**行情查询：**
+```
+[名称] ([代码]) [币种] 最新价
+今日涨跌幅 | 成交量 | 市值 | 同期涨跌幅
+近期重要事件 / 异动原因（如有）
 ```
 
-## 历史数据（akshare）
-
-### 涨停池
-```python
-import akshare as ak
-df = ak.stock_zt_pool_em(date="20260519")
+**财报解读：**
+```
+关键科目（YoY/QoQ）+ Beat/Miss 判定
+亮点 / 关注点 / 风险点
+估值更新（PE/PB/PS 与历史区间对比）
 ```
 
-### 个股K线（均线计算）
-```python
-df = ak.stock_zh_a_hist(symbol="002245", period="daily", start_date="20260501", end_date="20260519")
-ma5 = df['收盘'].rolling(5).mean().iloc[-1]
-ma10 = df['收盘'].rolling(10).mean().iloc[-1]
+**选股筛选：**
+```
+筛选条件（明确写出阈值）
+候选清单（表格：代码 | 名称 | 关键指标 | 一句话亮点 | 风险）
+优先级排序
 ```
 
-### 板块涨幅
-```python
-df = ak.stock_board_industry_name_em()
+**事件日历：**
+```
+日期 | 标的 | 事件类型 | 预期影响 | 备注
 ```
 
-## Python 脚本路径
+### 强制后缀
 
-| 脚本 | 用途 | 调用时机 |
-|------|------|---------|
-| `scripts/lobster_premarket_engine.py` | 盘前选股引擎 | 07:00 |
-| `scripts/lobster_bid_filter_v2.py` | 竞价过滤 | 09:25（依赖 /tmp/lobster_bid_input.json） |
-| `scripts/scoring_calculator.py` | 量化打分 | 盘前/收盘复盘 |
-| `scripts/lobster_backtest.py` | 简易回测 | 进化任务 |
-| `scripts/verify_rules.sh` | 规则一致性校验 | 12:30 |
-| `scripts/ima_sync.sh` | IMA 知识库同步 | 各任务完成后 |
-| `scripts/cron-tasks/CRON_NEWS_AFTERNOON_TASK.md` | 盘中下午快讯 | 14:00 |
-| `scripts/cron-tasks/CRON_NEWS_EVENING_TASK.md` | 晚间要闻 | 20:00 |
-
-## /tmp 中间文件
-
-| 文件 | 写入者 | 读取者 | 生命周期 |
-|------|--------|--------|---------|
-| `/tmp/lobster_premarket_candidates.json` | premarket_engine | bid_filter, 复盘 | 当日 |
-| `/tmp/lobster_bid_input.json` | 盘前任务手动构造 | bid_filter | 当日 |
-| `/tmp/lobster_bid_result.json` | bid_filter | 买点监控, 复盘 | 当日 |
-| `/tmp/scoring_result_*.json` | scoring_calculator | 复盘 | 当日 |
+每次输出末尾：
+```
+---
+本内容仅为信息整理与分析参考，不构成投资建议，投资有风险，决策需谨慎。
+```

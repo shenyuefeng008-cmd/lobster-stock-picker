@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-进化反馈分析器 v2 — 自动调参版
-读交易数据 → 直接改 config → 更新 feedback.json
+进化反馈分析器 v3 — 全参数自动进化版
+读交易数据 → 直接改 lobster-config.json → 更新 feedback.json
 
-修改 lobster-config.json 的规则：
-  维度胜率<40% ≥3笔 → 收紧(top_n-1 / score_per_zt+3)
+进化维度：
+  维度胜率<40% ≥3笔 → 收紧(top_n-1 / score+3)
   维度胜率>70% ≥3笔 → 放宽(top_n+1)
-  维度亏损>2% → 收紧止损1%/仓位降档
+  维度亏损>3% → 收紧止损1%
+  分时止盈胜率<30%或avg<-1% → 提高min_profit门槛
+  分时止盈胜率>60%且avg>2% → 降低min_profit门槛
+  2.0胜率<40%或avg<-2% → 增加min_hold_days
+  2.0胜率>70%且avg>3% → 减少min_hold_days
+  1.0胜率<35%或avg<-4% → 收紧冰点仓位
+  1.0胜率>60%且avg>3% → 放宽冰点仓位
 """
 
 import json, datetime, sys, os
@@ -84,7 +90,8 @@ def analyze_trades(trade_log):
         "win_rate": round(len([t for t in closed if t['pnl_pct'] > 0])/len(closed)*100, 1) if closed else 0,
         "total_pnl_pct": round(sum(t['pnl_pct'] for t in closed), 2),
         "avg_pnl_pct": round(sum(t['pnl_pct'] for t in closed)/len(closed), 2) if closed else 0,
-        "by_dimension": {}
+        "by_dimension": {},
+        "by_sell_type": {}
     }
 
     for dim, trades in by_dim.items():
@@ -97,6 +104,20 @@ def analyze_trades(trade_log):
             "total_pnl_pct": round(dim_pnl, 2),
             "avg_pnl_pct": round(dim_pnl/len(trades), 2)
         }
+
+    # ── 按卖出类型分析（用于分时止盈进化） ──
+    sell_types = ['分时止盈', '硬止损', '时间止损', '技术止损', '止盈', '止损']
+    for st in sell_types:
+        matched = [t for t in closed if st in t.get('sell_reason', '') or st in t.get('type', '')]
+        if matched:
+            wins = [t for t in matched if t['pnl_pct'] > 0]
+            result["by_sell_type"][st] = {
+                "count": len(matched),
+                "wins": len(wins),
+                "win_rate": round(len(wins)/len(matched)*100, 1),
+                "total_pnl_pct": round(sum(t['pnl_pct'] for t in matched), 2),
+                "avg_pnl_pct": round(sum(t['pnl_pct'] for t in matched)/len(matched), 2)
+            }
 
     return result
 
@@ -314,11 +335,81 @@ def apply_config_adjustments(trade_analysis, trade_log, config):
             stop_path = ["stop_loss", dim, "hard_stop_pct"]
             cur_stop = get_config_value(config, stop_path)
             if cur_stop is not None:
-                new_stop = round(cur_stop + 1, 1)  # -5→-4 (收窄)
+                new_stop = round(cur_stop + 1, 1)  # -7→-6 (收窄)
                 if new_stop < 0:
                     changed, old = set_config_value(config, stop_path, new_stop)
                     if changed:
                         changes.append(f"{label}.hard_stop: {old}→{new_stop}% (亏损{avg_pnl}% 收窄止损)")
+
+    # ── 分时止盈进化（按卖出类型分析） ──
+    sell_type_stats = trade_analysis.get("by_sell_type", {})
+    tp_stats = sell_type_stats.get("分时止盈")
+    if tp_stats and tp_stats["count"] >= 3:
+        tp_key = "分时止盈"
+        if not _already_adjusted_today(tp_key):
+            tp_wr = tp_stats["win_rate"]
+            tp_avg = tp_stats["avg_pnl_pct"]
+            tp_path = ["intraday_take_profit", "min_profit_pct"]
+            cur_min = get_config_value(config, tp_path) or 5.0
+            if tp_wr < 30 or tp_avg < -1:
+                # 胜率太低或平均亏损 → 提高门槛（盈利不够不止盈）
+                new_min = min(cur_min + 1.0, 10.0)
+                changed, old = set_config_value(config, tp_path, new_min)
+                if changed:
+                    changes.append(f"分时止盈.min_profit: {old}%→{new_min}% (胜率{tp_wr}% avg{tp_avg}%，门槛提高避免太早止盈)")
+            elif tp_wr > 60 and tp_avg > 2:
+                # 胜率高且盈利好 → 降低门槛（多止盈）
+                new_min = max(cur_min - 0.5, 3.0)
+                changed, old = set_config_value(config, tp_path, new_min)
+                if changed:
+                    changes.append(f"分时止盈.min_profit: {old}%→{new_min}% (胜率{tp_wr}% avg{tp_avg}%，效果好在降低门槛)")
+
+    # ── 2.0持仓天数进化 ──
+    dim2_stats = trade_analysis.get("by_dimension", {}).get("2.0")
+    if dim2_stats and dim2_stats["count"] >= 3:
+        key2 = "2.0板块卡位"
+        if not _already_adjusted_today(key2):
+            d2_wr = dim2_stats["win_rate"]
+            d2_avg = dim2_stats["avg_pnl_pct"]
+            hold_path = ["dimensions", "2.0", "min_hold_days"]
+            cur_hold = get_config_value(config, hold_path) or 1
+            if d2_wr < 40 or d2_avg < -2:
+                # 胜率低/亏损 → 增加持仓天数（别一日游就卖）
+                new_hold = cur_hold + 1
+                if new_hold <= 5:
+                    changed, old = set_config_value(config, hold_path, new_hold)
+                    if changed:
+                        changes.append(f"2.0.min_hold_days: {old}天→{new_hold}天 (胜率{d2_wr}% avg{d2_avg}%，延长持仓)")
+            elif d2_wr > 70 and d2_avg > 3:
+                # 胜率高盈利好 → 缩短持仓（早止盈）
+                new_hold = cur_hold - 1
+                if new_hold >= 1:
+                    changed, old = set_config_value(config, hold_path, new_hold)
+                    if changed:
+                        changes.append(f"2.0.min_hold_days: {old}天→{new_hold}天 (胜率{d2_wr}% avg{d2_avg}%，缩短持仓)")
+
+    # ── 冰点期仓位进化（从历史新闻/复盘记录推断冰点期交易） ──
+    # 策略：如果"1.0"维度在冰点区(<1500)买入的交易胜率低 → 收紧冰点仓位
+    # 冰点期特征：1.0维度本身就代表冰点主导操作
+    dim1_stats = trade_analysis.get("by_dimension", {}).get("1.0")
+    if dim1_stats and dim1_stats["count"] >= 3:
+        ice_key = "冰点期仓位"
+        if not _already_adjusted_today(ice_key):
+            d1_wr = dim1_stats["win_rate"]
+            d1_avg = dim1_stats["avg_pnl_pct"]
+            ice_pos_path = ["emotion", "below_1600", "pos_limit_pct"]
+            cur_ice_pos = get_config_value(config, ice_pos_path) or 30
+            # 1.0本身就是冰点区操作，胜率低说明冰点区应该降低仓位
+            if d1_wr < 35 or d1_avg < -4:
+                new_ice_pos = max(cur_ice_pos - 10, 10)
+                changed, old = set_config_value(config, ice_pos_path, new_ice_pos)
+                if changed:
+                    changes.append(f"冰点仓位上限: {old}%→{new_ice_pos}% (1.0胜率{d1_wr}% avg{d1_avg}%，冰点区降低风险敞口)")
+            elif d1_wr > 60 and d1_avg > 3:
+                new_ice_pos = min(cur_ice_pos + 5, 40)
+                changed, old = set_config_value(config, ice_pos_path, new_ice_pos)
+                if changed:
+                    changes.append(f"冰点仓位上限: {old}%→{new_ice_pos}% (1.0胜率{d1_wr}% avg{d1_avg}%，冰点区表现好适度放宽)")
 
     return changes
 

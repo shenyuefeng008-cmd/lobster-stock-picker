@@ -3,10 +3,11 @@
 
 import json, subprocess, re, sys, datetime, os, os
 from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
 
 # ==================== 开盘时间验证 ====================
 def is_trading_time():
-    """检查当前是否在A股交易时间（含竞价）"""
+    """检查当前是否在A股交易时间（含竞价，含收盘后5分钟窗口供复核）"""
     now = datetime.datetime.now()
     hm = now.strftime("%H:%M")
     
@@ -16,13 +17,13 @@ def is_trading_time():
     # 上午交易 09:30-11:30
     if "09:30" <= hm < "11:30":
         return True
-    # 下午交易 13:00-15:00
-    if "13:00" <= hm < "15:00":
+    # 下午交易 13:00-15:05
+    if "13:00" <= hm <= "15:05":
         return True
     return False
 
 if not is_trading_time():
-    print(f"⏸️ 非交易时间 ({datetime.datetime.now().strftime('%H:%M')})，买点监控跳过")
+    print(f"⏸️ 非交易时间 ({datetime.datetime.now().strftime('%H:%M')})，买点监控跳过（正常行为，收盘后可运行）")
     sys.exit(0)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -57,14 +58,43 @@ def get_30_emotion_rules():
 
 def fetch_live_emotion():
     """实时获取涨跌家数（多源保活），拒绝使用过时数据"""
-    import sys, os
+    import sys, os, subprocess, re, json as _json, urllib.request as _ur
     
     # 添加scripts目录到path
     script_dir = os.path.dirname(os.path.abspath(__file__))
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
     
-    # === 主源：腾讯接口采样估算 ===
+    # === 主源：华泰 marketInsight（HTSC skill） ===
+    try:
+        htsc_config = os.path.expanduser('~/.htsc-skills/config')
+        with open(htsc_config) as f:
+            for line in f:
+                if '=' in line:
+                    k, v = line.strip().split('=', 1)
+                    if k == 'HT_APIKEY':
+                        os.environ['HT_APIKEY'] = v
+                        break
+        r = subprocess.run([
+            'python3', os.path.join(_FIN_ANALYSIS, 'financial_analysis.py'),
+            'marketInsight', '--query', '今天A股涨跌家数 上涨家数 下跌家数 涨停家数 跌停家数'
+        ], capture_output=True, text=True, timeout=30, cwd=_FIN_ANALYSIS)
+        out = r.stdout + r.stderr
+        # 正则提取数字：上涨X家、下跌X家、涨停X家、跌停X家
+        mu = re.search(r'上涨[：:\s]*(\d+)\s*家', out)
+        md = re.search(r'下跌[：:\s]*(\d+)\s*家', out)
+        mz = re.search(r'涨停[：:\s]*(\d+)\s*家', out)
+        mt = re.search(r'跌停[：:\s]*(\d+)\s*家', out)
+        up = int(mu.group(1)) if mu else 0
+        down = int(md.group(1)) if md else 0
+        zt = int(mz.group(1)) if mz else 0
+        dt = int(mt.group(1)) if mt else 0
+        if up > 0 and down > 0:
+            return {'up': up, 'down': down, 'zt': zt, 'dt': dt, 'src': 'htsc'}
+    except Exception as e:
+        print(f"华泰marketInsight失败: {e}")
+    
+    # === 备源1：腾讯接口采样估算 ===
     try:
         from get_market_sentiment import get_sentiment_legacy_format
         sentiment = get_sentiment_legacy_format()
@@ -73,7 +103,7 @@ def fetch_live_emotion():
     except Exception as e:
         print(f"腾讯接口采样失败: {e}")
     
-    # === 备源1：legulegu.com ===
+    # === 备源2：legulegu.com ===
     try:
         import subprocess, re
         r = subprocess.run(["curl","-s","-L","--max-time","10","-A","Mozilla/5.0",
@@ -112,6 +142,17 @@ def fetch_live_emotion():
         pass
     
     return None
+
+
+# ==================== 赛道快照加载 ====================
+def load_hot_sectors():
+    """加载盘前引擎产出的当日热点赛道"""
+    try:
+        with open(ROOT / 'trading' / 'hot_sectors.json') as f:
+            snap = json.load(f)
+        return set(snap.get('hot_sectors', []))
+    except:
+        return set()
 
 # ==================== 催化剂否决规则集成 ====================
 try:
@@ -166,8 +207,13 @@ def calc_ma(klines, period):
         return None
     return sum(k['close'] for k in klines[-period:]) / period
 
-def detect_10_divergence_low(code, name, quotes):
-    """1.0分歧低吸买点检测：回踩MA5/MA10 + 缩量企稳（已修复盘中量换算bug）"""
+def detect_10_divergence_low(code, name, sector, quotes, hot_sectors=None):
+    """1.0分歧低吸买点检测：回踩MA5/MA10 + 缩量企稳（已修复盘中量换算bug）
+    赛道加权：热点赛道的MA10阈值从2%放宽到3%，缩量判定从1.2放宽到1.3"""
+    # 赛道加权：热点赛道降低触发门槛
+    is_hot = (hot_sectors and sector in hot_sectors) if hot_sectors else False
+    ma10_threshold = 0.97 if is_hot else 0.98   # 热点 -3% vs 普通 -2%
+    vol_threshold = 1.3 if is_hot else 1.2       # 热点 130% vs 普通 120%
     import datetime as dt2  # 避免与外层dt冲突
     klines = get_kline(code, 10)
     if not klines or len(klines) < 5:
@@ -182,8 +228,8 @@ def detect_10_divergence_low(code, name, quotes):
         return None, "MA计算失败"
     
     # 条件1：价格在MA5和MA10之间或回踩不破
-    if cur_price < ma10 * 0.98:  # 跌破MA10超过2%
-        return None, f"价格{cur_price:.2f}跌破MA10({ma10:.2f})"
+    if cur_price < ma10 * ma10_threshold:  # 跌破MA10超过阈值
+        return None, f"价格{cur_price:.2f}跌破MA10({ma10:.2f})[阈值{int((1-ma10_threshold)*100)}%]"
     
     # 条件2：缩量或平量（v2修复：按已交易时长换算预估全天量再对比）
     vol_5avg = sum(k['volume'] for k in klines[-5:]) / 5  # 单位：手
@@ -206,7 +252,7 @@ def detect_10_divergence_low(code, name, quotes):
     estimated_full_vol = cur_vol / session_ratio if session_ratio > 0.05 else cur_vol
     
     # 放宽20%容错（应对盘中波动），缩量判定：预估全天量 < 均量*1.2
-    if estimated_full_vol > vol_5avg * 1.2:
+    if estimated_full_vol > vol_5avg * vol_threshold:
         ratio_pct = cur_vol / vol_5avg * 100 if vol_5avg > 0 else 0
         return None, f"量能未缩(实时{cur_vol:.0f}手→预估全天{estimated_full_vol:.0f}手 > 均量{vol_5avg:.0f}手，实时/均量={ratio_pct:.0f}%)"
     
@@ -227,17 +273,19 @@ def get_sector_limit_up(sector):
         count = len(df[df['所属行业'] == sector]) if '所属行业' in df.columns else 0
         return count
     except:
-        # 尝试从/tmp读取今日数据
+        # 尝试从 trading/ 读取今日数据
         try:
-            with open(f"/tmp/sector_limit_up_{datetime.date.today().strftime('%Y%m%d')}.json", "r") as f:
+            limit_file = ROOT / 'trading' / f"sector_limit_up_{datetime.date.today().strftime('%Y%m%d')}.json"
+            with open(limit_file, "r") as f:
                 data = json.load(f)
                 return data.get(sector, 0)
         except:
             return 0
 
-def detect_20_sector_leader(code, name, sector, quotes):
-    """2.0板块卡位买点检测：板块涨停≥3 + 个股前排"""
-    limit_up_count = get_sector_limit_up(sector)
+def detect_20_sector_leader(code, name, sector, quotes, sector_zt_count=None):
+    """2.0板块卡位买点检测：板块涨停≥3 + 个股前排。
+    sector_zt_count 直接从候选JSON的 sector_zt 字段读取（引擎已统计），不再调用akshare。"""
+    limit_up_count = sector_zt_count if sector_zt_count is not None else 0
     if limit_up_count < 3:
         return None, f"板块{sector}涨停{limit_up_count}家<3"
     
@@ -251,12 +299,13 @@ def detect_20_sector_leader(code, name, sector, quotes):
     reason = f"板块卡位：{sector}涨停{limit_up_count}家+个股前排({cur_pct:+.2f}%)"
     return reason, None
 
-def detect_30_trend_low(code, name, quotes, up_count, locked=False, locked_reason=''):
+def detect_30_trend_low(code, name, sector, quotes, up_count, locked=False, locked_reason='', hot_sectors=None):
     """3.0趋势低吸买点检测（C+B运行时动态）：
     - 冰点<2000: 3.0熔断
     - 辅助模式>3500: 仅MA10低吸，≤1成
     - 2000-3500: 正常MA5回踩
-    - >2500连续2日: 完全激活"""
+    - >2500连续2日: 完全激活
+    赛道过滤：非热点+非锁定标的，需要异常放量（>均量1.5倍）才触发。"""
     _3r = get_30_emotion_rules()
     
     # 熔断条件
@@ -291,6 +340,17 @@ def detect_30_trend_low(code, name, quotes, up_count, locked=False, locked_reaso
         return ('AUX_LOWSUCK', reason), None
     
     # 正常模式：MA5回踩
+    # 赛道感知：非热点+非锁定标的，需要量能辅助确认
+    is_hot = (hot_sectors and sector in hot_sectors) if hot_sectors else True  # 无赛道数据时不设限
+    if not is_hot and not locked:
+        # 非热点板块需额外缩量/放量确认
+        klines_check = get_kline(code, 10)
+        if klines_check and len(klines_check) >= 5:
+            vol_5avg = sum(k['volume'] for k in klines_check[-5:]) / 5
+            cur_vol = quotes.get(code, {}).get('vol_wan', 0)
+            if cur_vol < vol_5avg * 1.5:
+                return None, f"非热点板块({sector})量能不足(实时{cur_vol:.0f}手<均量{vol_5avg:.0f}手×1.5)，不触发"
+
     klines = get_kline(code, 10)
     if not klines or len(klines) < 5:
         return None, "K线数据不足"
@@ -367,10 +427,11 @@ def detect_sell_signals(quotes):
         pct = q.get('pct', 0)
         is_limit = pct >= 9.8
         last_close = q.get('last_close', 0)
-        # 仅在14:50后检测（非交易时段检测无效）
+        # 仅在14:50后检测（14:50=890分钟）
         from datetime import datetime
         now = datetime.now()
-        if now.hour >= 14 and now.minute >= 50:
+        now_min = now.hour * 60 + now.minute
+        if now_min >= 890:
             # 超短逻辑：收盘未封板则卖出（不留恋）
             if not is_limit and pnl_pct >= 5:
                 signals.append({"code": code, "name": name, "action": "SELL_ALL", "reason": f"超短收盘未封板+盈利{pnl_pct:.1f}%清仓", "pnl_pct": pnl_pct})
@@ -489,9 +550,9 @@ def run():
     # 优先：关注股JSON（09:25竞价过滤→含全部候选+竞价标注）
     # 降级：盘前候选池JSON（07:00盘前引擎）
     source = '盘前候选池'
-    candidates_path = '/tmp/lobster_premarket_candidates.json'
+    candidates_path = str(ROOT / 'trading' / 'premarket_candidates.json')
     
-    watch_path = '/tmp/lobster_watchlist_candidates.json'
+    watch_path = str(ROOT / 'trading' / 'watchlist_candidates.json')
     if os.path.exists(watch_path):
         try:
             with open(watch_path) as f:
@@ -538,10 +599,14 @@ def run():
         up_count = -1  # 标记为不可用
 
     
-    # 读取实时行情（从/tmp/lobster_buypoint_data.json）
+    # 加载赛道快照
+    hot_sectors = load_hot_sectors()
+    print(f"  📡 赛道快照: {len(hot_sectors)}个热点赛道{list(hot_sectors)[:5] if hot_sectors else '(空)'}")
+    
+    # 读取实时行情（从 trading/buypoint_data.json）
     quotes = {}
     try:
-        with open('/tmp/lobster_buypoint_data.json') as f:
+        with open(ROOT / 'trading' / 'buypoint_data.json') as f:
             bp_data = json.load(f)
             # 这里需要从步骤1重新获取行情，或者把行情缓存到文件
     except:
@@ -605,7 +670,8 @@ def run():
             continue  # 不加入new_10，即删除
         
         # 检测买点
-        reason, err = detect_10_divergence_low(code, name, quotes)
+        sector = item.get('sector', '')
+        reason, err = detect_10_divergence_low(code, name, sector, quotes, hot_sectors)
         if reason:
             # 催化剂否决检查（NEW）
             veto = check_catalyst_veto('1.0分歧低吸', item, quotes)
@@ -657,7 +723,8 @@ def run():
             continue  # 不加入new_20，即删除
         
         # 检测买点
-        reason, err = detect_20_sector_leader(code, name, sector, quotes)
+        sector_zt_count = item.get('sector_zt', 0)
+        reason, err = detect_20_sector_leader(code, name, sector, quotes, sector_zt_count)
         if reason:
             # 催化剂否决检查（NEW）
             veto = check_catalyst_veto('2.0板块卡位', item, quotes)
@@ -725,7 +792,8 @@ def run():
             continue
         
         # 检测买点（传入locked状态）
-        result = detect_30_trend_low(code, name, quotes, up_count, locked, locked_reason)
+        sector = item.get('sector', '')
+        result = detect_30_trend_low(code, name, sector, quotes, up_count, locked, locked_reason, hot_sectors)
         if isinstance(result, tuple) and len(result) == 2:
             reason, err = result
         else:
@@ -746,7 +814,7 @@ def run():
                 new_30.append(item)
                 continue
             
-            # C+B：辅助模式仓位上限1成，正常模式按配置
+            # C+B：辅助模式仓位上限10%，正常模式按配置
             _3r = get_30_emotion_rules()
             if buy_type == 'AUX_LOWSUCK':
                 pos_pct = int(_3r['max_pos_cheng'] * 10)
@@ -791,7 +859,7 @@ def run():
                 notify_lines.append(line)
                 break
         
-        notify_path = f"/tmp/lobster_buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt"
+        notify_path = str(ROOT / 'trading' / f"buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt")
         with open(notify_path, 'w') as f:
             f.write('\n'.join(notify_lines))
         print(f"\n✅ 通知已保存: {notify_path}")
@@ -799,7 +867,7 @@ def run():
         print(f"暂无买点触发，情绪{emotion.get('主导维度', '未知')}，继续观察")
         # 清除旧通知文件
         try:
-            os.remove(f"/tmp/lobster_buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt")
+            os.remove(str(ROOT / 'trading' / f"buy_notification_{datetime.date.today().strftime('%Y%m%d')}.txt"))
         except:
             pass
     

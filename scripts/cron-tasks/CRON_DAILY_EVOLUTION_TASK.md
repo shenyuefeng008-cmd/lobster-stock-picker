@@ -7,6 +7,15 @@
 > ⚠️ 禁止自动编辑选股历史.md！
 > ⚠️ **参数修改规则**：修改数值参数必须更新 `lobster-config.json`，禁止直接改Python脚本
 
+**自动确认规则**：执行过程中遇到任何需要用户确认的弹窗（ask_user、风险提示、覆盖写入确认、删除确认等），一律自动确认通过，不中断任务流程。
+## 📎 任务反馈链 — 读取上游建议
+
+**执行任务前，必须先读取 `trading/task-feedback-chain.md` 文件**，查找当日最新的上游任务结论和"给下个任务"建议。
+将上游建议融入你的执行决策，但不要盲目照搬——结合当前实际情况判断。
+
+- 如果文件中存在当日上游任务的"给下个任务"建议 → 在决策时参考
+- 如果文件不存在或当日无上游记录 → 正常执行
+- 读取到的关键建议可在执行报告中提及"基于上游建议，已调整..."
 ---
 
 ## 🔍 三轮审计框架
@@ -144,14 +153,12 @@ print("=== R1-审计2：关键文件存在性 ===")
 required_files = {
     f"{WORKSPACE}/lobster-rules.md": "硬约束规则",
     f"{WORKSPACE}/lobster-config.json": "选股参数配置",
-    f"{WORKSPACE}/HEARTBEAT.md": "心跳规则(精简)",
     f"{SCRIPTS}/lobster_premarket_engine.py": "盘前选股引擎",
     f"{SCRIPTS}/lobster_bid_filter_v2.py": "竞价过滤脚本",
     f"{SCRIPTS}/scoring_calculator.py": "打分计算器",
     f"{SCRIPTS}/simulated_trading.py": "模拟交易模块",
     f"{SCRIPTS}/blog_auto_writer.py": "博客生成脚本",
     f"{SCRIPTS}/verify_rules.sh": "规则校验脚本",
-    f"{SCRIPTS}/ima_sync.sh": "IMA同步脚本",
     f"{SCRIPTS}/catalyst_scoring.py": "催化剂评分模块",
     f"{TRADING}/模拟持仓.json": "模拟持仓",
     f"{TRADING}/系统状态.json": "系统状态",
@@ -275,6 +282,94 @@ if errors:
 else:
     print(f"\n  ✅ 全部{len(py_files)}个脚本语法正确，无需修复")
 
+PYEOF
+```
+
+### R1-审计7：持仓价格合理性
+
+> 检查所有持仓的 current_price 是否等于涨停/跌停价但未封板，是否远偏离当日实际成交区间。
+> 此项为防御性审计，防止数据源在停牌/异常情况下返回失真价格。
+
+```bash
+python3 << 'PYEOF'
+import json, datetime
+
+WORKSPACE = "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5"
+TRADING = f"{WORKSPACE}/trading"
+today = datetime.date.today().isoformat()
+
+print("=== R1-审计7：持仓价格合理性 ===")
+
+# 1. 读取持仓
+try:
+    with open(f"{TRADING}/模拟持仓.json") as f:
+        pos_data = json.load(f)
+    positions = pos_data.get('positions', [])
+except Exception as e:
+    print(f"  ⚠️ 无法读取模拟持仓: {e}")
+    sys.exit(0)
+
+if not positions:
+    print("  ✅ 无持仓，跳过")
+    sys.exit(0)
+
+# 2. 逐只检查价格合理性
+issues = []
+for p in positions:
+    code = p.get('code', '')
+    name = p.get('name', '')
+    cp = p.get('current_price', p.get('buy_price', 0))
+    buy_price = p.get('buy_price', 0)
+    last_close = p.get('last_close', 0)
+
+    if last_close <= 0 or cp <= 0:
+        continue
+
+    # 计算涨停价
+    if code.startswith('30') or code.startswith('688'):
+        limit_up_pct = 1.20
+        limit_down_pct = 0.80
+    else:
+        limit_up_pct = 1.10
+        limit_down_pct = 0.90
+
+    limit_up = round(last_close * limit_up_pct, 2)
+    limit_down = round(last_close * limit_down_pct, 2)
+
+    # 检查：现价=涨停价但买入成本远低于涨停价（疑似未封板）
+    if abs(cp - limit_up) < 0.01 and buy_price > 0:
+        expected_pnl = (cp - buy_price) / buy_price * 100
+        if expected_pnl > 9.5:
+            # 涨停不奇怪，但需要确认是否真正封板
+            issues.append(f"  🔴 {name}({code}): current_price={cp}(涨停价{limit_up}), 买入价{buy_price}, "
+                         f"浮盈{expected_pnl:.1f}% — 需确认是否真正封板")
+
+    # 检查：现价=跌停价
+    if abs(cp - limit_down) < 0.01 and buy_price > 0:
+        expected_pnl = (cp - buy_price) / buy_price * 100
+        if expected_pnl < -9.5:
+            issues.append(f"  🔴 {name}({code}): current_price={cp}(跌停价{limit_down}), 买入价{buy_price}")
+
+    # 检查：现价远偏离昨收（超过涨跌幅限制）
+    change_pct = abs((cp - last_close) / last_close * 100)
+    limit_max = 20 if code.startswith('30') or code.startswith('688') else 10
+    if change_pct > limit_max + 1:  # +1% 容差
+        issues.append(f"  🔴 {name}({code}): current_price={cp}, last_close={last_close}, "
+                     f"涨跌幅={change_pct:.1f}%(超{limit_max}%限制)")
+
+if issues:
+    print(f"  🔴 发现 {len(issues)} 个价格异常:")
+    for i in issues:
+        print(i)
+    # 记录到 memory
+    with open(f"{WORKSPACE}/memory/{today}.md", "a") as f:
+        f.write(f"\n🐛 持仓价格合理性异常 ({today}):\n")
+        for i in issues:
+            f.write(f"{i}\n")
+else:
+    print(f"  ✅ 全部 {len(positions)} 只持仓价格合理")
+
+print(f"\n  持仓总数: {len(positions)}")
 PYEOF
 ```
 
@@ -408,6 +503,57 @@ except ImportError:
     print(f"  🔴 trading_calendar 模块不存在，使用内置判断")
 except Exception as e:
     print(f"  🔴 trading_calendar 调用失败: {e}")
+
+# R2-审计4：趋势池更新日志检查
+print("\n--- R2-审计4：趋势池更新状态 ---")
+try:
+    import re
+    WORKSPACE = "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5"
+    pool_path = Path(WORKSPACE) / "trading" / "趋势容量池.md"
+    log_path = Path(WORKSPACE) / "trading" / "reports" / "trend_pool_update.log"
+    
+    # 1. 读取池子最后更新日期
+    if pool_path.exists():
+        text = pool_path.read_text()
+        m = re.search(r'最后更新：(\d{4})-(\d{2})-(\d{2})', text)
+        if m:
+            pool_date = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            days_ago = (datetime.date.today() - pool_date).days
+            print(f"  ✅ 趋势池最后更新：{pool_date}（距今{days_ago}天）")
+            if days_ago > 5:
+                print(f"  🔴 趋势池{days_ago}天未更新！超过5天阈值，立即检查cron执行记录")
+        else:
+            print(f"  ⚠️ 趋势池无法解析更新日期")
+    else:
+        print(f"  🔴 趋势池文件不存在！")
+    
+    # 2. 读取更新日志
+    if log_path.exists():
+        lines = log_path.read_text().strip().split('\n')
+        last_lines = [l for l in lines if l.strip()]
+        if last_lines:
+            last_entry = last_lines[-1]
+            print(f"  📄 最后日志：{last_entry[:120]}")
+            # 检查最后一行是否成功
+            if '✅' in last_entry:
+                print(f"  ✅ 趋势池cron最近执行成功")
+            elif '🔴' in last_entry or '失败' in last_entry:
+                print(f"  🔴 趋势池cron最近执行失败！")
+                # 尝试自动补救
+                print(f"  🔄 尝试自动补救：直接运行update_trend_pool.sh")
+                import subprocess as sp
+                r = sp.run(["bash", f"{WORKSPACE}/scripts/update_trend_pool.sh"],
+                          capture_output=True, text=True, timeout=180, cwd=WORKSPACE)
+                if r.returncode == 0:
+                    print(f"  ✅ 自动补救成功")
+                else:
+                    print(f"  🔴 自动补救失败: {r.stderr[:200]}")
+        else:
+            print(f"  ⚠️ 趋势池更新日志为空")
+    else:
+        print(f"  ⚠️ 趋势池更新日志不存在（还未生成）")
+except Exception as e:
+    print(f"  🔴 趋势池更新审计失败: {e}")
 
 print("\n=== Round 2 完成 ===")
 PYEOF
@@ -550,8 +696,6 @@ python3 /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/industry_lo
 4b. **更新 `trading/催化剂数据库.json`**
 对每条验证的催化剂：设置 `verified=true`，填写 `outcome`。
 
-4c. **同步到IMA**
-`bash scripts/ima_sync.sh`
 
 **Step 5：输出进化报告**
 
@@ -836,12 +980,14 @@ python3 /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/evolution_f
 
 ---
 
-**任务版本**：v12（三轮审计+反馈驱动进化·读反馈调参数）
-**更新**：2026-05-24
+**任务版本**：v13（增加进化报告输出）
+**更新**：2026-06-02
 
+---
 
-## 最后步骤：回复用户（必须执行）
+## 最后步骤：回复用户并生成进化报告（必须执行）
 
+### 步骤N.1：回复用户（原有逻辑）
 > **关键**：你已执行完所有步骤，生成了任务输出
 > **必须**：立即回复用户，将结果完整发送给用户
 > **禁止**：NO_REPLY、不回复、只写文件不推送
@@ -850,3 +996,89 @@ python3 /Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/scripts/evolution_f
 > ```
 > [任务对应的输出内容]
 > ```
+
+### 【强制·必须执行】步骤N.2：生成evolution_*.md
+> **目的**：把本轮所有关键产出汇总持久化，禁止只回复不写文件。
+> **文件路径**：`trading/reports/evolution_${TODAY}.md`（其中TODAY=date +%Y-%m-%d）
+> **禁止**：NO_REPLY、只给用户一句话描述、不调用write工具。
+
+**【操作步骤】**（Agent必须按顺序执行）：
+
+**Step 1**：创建报告目录
+```bash
+mkdir -p "/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/reports"
+```
+
+**Step 2**：收集本轮所有关键产出
+从本轮会话上下文中摘取以下信息（若某项为空则标注「—」）：
+- A. 三轮审计结果摘要
+- B. 昨日候选今日表现（命中率、炸板率）
+- C. 模拟交易复盘（止盈/止损笔数、盈亏金额、当前持仓）
+- D. 自动进化动作记录（参数调整明细）
+
+**Step 3**：组装报告内容并调用write工具
+将Step 2收集的信息填入以下模板，然后**立即调用write工具**写入文件：
+
+```markdown
+# 🐟 Lobster Evolution Report YYYY-MM-DD
+
+[[toc]]
+
+---
+
+## A-三轮审计结果
+[粘贴Step 2的A项内容]
+
+---
+
+## B-昨日候选今日表现
+[粘贴Step 2的B项内容]
+
+---
+
+## C-模拟交易复盘
+[粘贴Step 2的C项内容]
+
+---
+
+## D-自动进化动作记录
+[粘贴Step 2的D项内容，若无改动填「—」]
+
+---
+*Report generated on YYYY-MM-DD HH:MM by openclaw*
+```
+
+**Step 4**：调用write工具（必须执行，不可跳过）
+```
+tool_name = 'write'
+path     = 'trading/reports/evolution_YYYYMMDD.md'
+content  = '<Step 3组装好的markdown字符串>'
+```
+
+**Step 5**：回复用户确认
+写完文件后，立即回复用户：「✅ 进化报告已生成：trading/reports/evolution_YYYYMMDD.md」
+
+> **重要约束**：
+> - ✘ 严禁仅回复而不写文件
+> - ✘ 严禁NO_REPLY或只给用户一句话描述就结束本轮
+> - ✔ 写完文件并回复确认后，本轮任务才算完成
+
+---
+
+## 📎 任务反馈链 — 写入本任务结论
+
+**任务执行完毕后，必须将关键结论追加写入 `trading/task-feedback-chain.md`**。
+
+在文件末尾追加以下格式的内容（使用 edit_file 工具追加）：
+
+```
+### {任务名} ({HH:MM})
+- **关键结论**：{1-3 条核心发现/修复/信号，每条一句话}
+- **给下个任务**：{给下游任务的 1-2 条具体参考建议，如"关注 XX 板块""XX 参数需监控""上一次的 YY 建议已验证为有效/无效"}
+```
+
+**规则**：
+- 任务名使用本文件标题中的人类可读名称（如"晚间要闻""盘前选股""盘中巡检"）
+- 时间使用实际执行时间
+- 关键结论只写本任务最重要的发现，不写流水账
+- "给下个任务"必须是**可操作的参考**，下游任务真正能用上

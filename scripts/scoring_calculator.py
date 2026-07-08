@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 龙虾量化打分计算器 v2.1
-用法：python3 scoring_calculator.py --dimension 1.0_一进二 --data-file /tmp/stock_data.json
+用法：python3 scoring_calculator.py --dimension 1.0_一进二 --data-file trading/stock_data.json
 输出：按分数从高到低排序的候选股列表
 """
 
 import json
 import argparse
 import sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
 
 # 打分模型定义
 SCORING_MODELS = {
@@ -219,7 +221,7 @@ def main():
         stock = r["stock"]
         print(f"【第{i}名】{stock.get('名称', '未知')}({stock.get('代码', '未知')}) — 总分：{r['score']:.1f}")
         print(f"  买入条件：{stock.get('买入条件', '待定')}")
-        print(f"  仓位：{stock.get('仓位', '0成')}")
+        print(f"  仓位：{stock.get('仓位', '0%')}")
         print(f"  打分明细：")
         for detail in r["details"]:
             print(f"    - {detail}")
@@ -236,13 +238,13 @@ def main():
         print(f"{i}. {stock.get('名称', '未知')}({stock.get('代码', '未知')}) — {r['score']:.1f}分")
     
     # 保存结果到JSON
-    output_file = f"/tmp/scoring_result_{args.dimension}.json"
+    output_file = str(ROOT / "trading" / f"scoring_result_{args.dimension}.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     print(f"\n💾 完整结果已保存：{output_file}\n")
     
     # 额外保存分项得分JSON（权重进化用）
-    factor_file = f"/tmp/scoring_factor_{args.dimension}.json"
+    factor_file = str(ROOT / "trading" / f"scoring_factor_{args.dimension}.json")
     factor_data = []
     for r in results:
         stock_code = r["stock"].get("代码", "?")

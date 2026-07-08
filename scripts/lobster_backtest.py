@@ -9,6 +9,9 @@ import akshare as ak
 import pandas as pd
 import numpy as np
 import json
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+TRADING = ROOT / 'trading'
 
 # ============================================================
 # 数据准备
@@ -85,14 +88,17 @@ def get_dimension(updown):
         return '辅助模式'
 
 def get_position_limit(updown):
+    """返回仓位上限（小数，如0.5表示50%）"""
     if updown < 1500:
-        return 0.5
+        return 0.3  # 30%
+    elif updown < 2000:
+        return 0.4  # 40%
     elif updown < 2500:
-        return 1.0
+        return 0.9  # 90%
     elif updown < 3500:
-        return 0.7
+        return 0.7  # 70%
     else:
-        return 0.2
+        return 0.2  # 20%
 
 # ============================================================
 # 模拟引擎
@@ -425,7 +431,8 @@ result = {
     'equity_curve': equity_curve
 }
 
-with open('/tmp/lobster_sim_result.json', 'w', encoding='utf-8') as f:
+result_path = TRADING / 'sim_result.json'
+with open(result_path, 'w', encoding='utf-8') as f:
     json.dump(result, f, ensure_ascii=False, indent=2)
 
-print(f"\n✅ 结果已保存至 /tmp/lobster_sim_result.json")
+print(f"\n✅ 结果已保存至 {result_path}")

@@ -1,0 +1,22 @@
+{
+  "active": [
+    {"name": "半导体设备材料", "weight": 5, "source": "政策", "added": "2026-07-07", "last_signal": "2026-07-07", "weak_streak": 0, "tags": ["国产替代", "晶圆厂扩产", "先进封装"]},
+    {"name": "低空经济", "weight": 4, "source": "政策", "added": "2026-07-07", "last_signal": "2026-07-07", "weak_streak": 0, "tags": ["eVTOL", "空域开放", "无人机"]},
+    {"name": "人形机器人", "weight": 5, "source": "政策", "added": "2026-07-07", "last_signal": "2026-07-07", "weak_streak": 0, "tags": ["特斯拉链", "宇树", "供应链"]},
+    {"name": "新型储能", "weight": 3, "source": "政策", "added": "2026-07-07", "last_signal": "2026-07-07", "weak_streak": 0, "tags": ["固态电池", "钠离子", "液流电池"]},
+    {"name": "商业航天", "weight": 3, "source": "政策", "added": "2026-07-07", "last_signal": "2026-07-07", "weak_streak": 0, "tags": ["卫星互联网", "可回收火箭", "低轨星座"]}
+  ],
+  "inactive": [],
+  "evolution_log": [
+    {"time": "2026-07-07", "event": "init", "name": "-", "detail": "赛道雷达系统初始化，激活5个政策赛道"}
+  ],
+  "config": {
+    "max_active": 8,
+    "min_weight_policy": 1,
+    "remove_threshold": 3,
+    "policy_protection_days": 30,
+    "signal_threshold_add": 5,
+    "signal_threshold_up": 8
+  },
+  "last_run": "2026-07-07"
+}

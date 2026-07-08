@@ -286,3 +286,536 @@
 - **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
 
 ---
+
+## BUG-020：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-03
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-021：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-04
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-022：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-09
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-023：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-10
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-024：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-10
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-025：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-10
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-026：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-10
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-027：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-10
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-028：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-10
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-029：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-10
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-030：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-10
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-031：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-10
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-032：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-10
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-033：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-11
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-034：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-11
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-035：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-11
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-036：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-12
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-037：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-12
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-038：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-039：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-040：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-041：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-042：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-043：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-044：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-045：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-046：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-047：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-048：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-049：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-050：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-15
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-051：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-15
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-052：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-17
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-053：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-17
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-054：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-18
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-055：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-18
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-056：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-19
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-057：total_assets 不一致（回归 BUG-012）
+- **日期**：2026-06-19
+- **根因**：available_cash 或 market_value 更新不同步
+- **修复**：重新计算 total_assets = available_cash + market_value
+- **预防**：buy()/sell() 后同时更新 available_cash 和 market_value
+
+---
+
+## BUG-058：sell_partial() 未调用 _update_capital_after_trade()（BUG-010根因修复）
+- **日期**：2026-06-20 发现
+- **现象**：BUG-010/012 从5月底反复回归30+次，每次修数据但根因未除
+- **根因**：`sell_partial()` 第833行 `_save(data)` 前未调用 `_update_capital_after_trade()`，导致部分卖出后 market_value 和 total_assets 不同步
+- **修复**：`sell_partial()` 在 `_save(data)` 前增加 `_update_capital_after_trade(data, actual_price, code)`
+- **预防**：所有 trade 操作（buy/sell/sell_partial）后必须调用 `_update_capital_after_trade()`
+
+## BUG-059：sell_partial() position_pct 用 initial_capital（BUG-012回归根因之一）
+- **日期**：2026-06-20 发现
+- **现象**：部分卖出后仓位百分比错误
+- **根因**：`sell_partial()` 第813行用 `data['_meta'].get('initial_capital', 1000000)` 计算 position_pct
+- **修复**：改为 `data['capital']['total_assets']`，与 `buy()` 一致
+- **预防**：仓位百分比计算统一使用 total_assets
+
+## BUG-060：update_positions_price() 除零风险
+- **日期**：2026-06-20 发现
+- **现象**：`p['cost']` 为0时 `total_pnl_pct` 计算除零
+- **根因**：无除零保护
+- **修复**：增加 `if p['cost'] else 0` 条件
+- **预防**：所有除法运算必须有除零保护
+
+## BUG-061：rules vs config 配置不一致
+- **日期**：2026-06-20 发现
+- **现象**：rules说1.0止损-5%（实际-7%），3.0入选阈值30分（实际70分）
+- **根因**：config更新后rules文档未同步
+- **修复**：更新rules文档，1.0止损→-7%，3.0阈值→70分
+- **预防**：config参数变更必须同步更新rules文档
+
+## BUG-062：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-22
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-063：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-22
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-064：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-29
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-065：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-30
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-066：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-30
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-067：market_value 不一致（回归 BUG-010）
+- **日期**：2026-06-30
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-013（2026-07-01）：三重校验两次误砍仓位
+
+**现象**：盘前选股输出 `总仓位上限: 15%`，但 139涨 应为 30%（冰点区间）
+
+**根因**：两重逻辑错误叠加
+
+1. **执行顺序错误**：`emotion['up_count'] = ad['up']` 写在三重校验之后，导致 `today_up=0`（未赋值），触发校验3误判
+2. **校验3阈值错误**：`today_up < 500` 永远会命中冰点日（139<500），将合法冰点数据当作数据错误再次减半
+
+**触发条件**：`up < 500` 的冰点日（139/299/450 等）
+
+**修复**：
+- `scripts/lobster_premarket_engine.py`：将 `up_count` 赋值移至三重校验之前
+- `scripts/lobster_premarket_engine.py`：移除 `today_up < 500` 条件（`get_advance_decline` 已有 `up>0` 保护，冰点日合法数据不应触发）
+
+**验证**：139冰点→30%✅，2775高潮→70%✅，4001极热→10%✅
+
+**教训**：`up_count` 必须在使用前赋值；三重校验的极端值阈值应只处理真正的数据异常（>4000），不应覆盖正常冰点区间（100-500）
+
+## BUG-068：_load() 缺少文件损坏恢复机制
+- **日期**：2026-07-02 发现
+- **现象**：`模拟持仓.json` 如果损坏（JSON格式错误），`_load()` 直接抛出异常，导致整个模拟交易系统崩溃
+- **根因**：`_load()` 函数没有 try-except 保护，没有备份恢复机制
+- **修复**：增加文件损坏恢复机制：（1）尝试加载主文件 （2）失败则尝试从 .bak 备份恢复；（3）都失败则返回空数据结构并创建新文件
+- **预防**：所有 JSON 读写函数必须有 try-except 保护；关键数据文件写入前先备份
+
+## BUG-069：lobster-rules.md 与 config 不一致（1600_2000 仓位上限）
+- **日期**：2026-07-02 发现
+- **现象**：rules 第19行说 `1500-2000 → 仓位上限40%`，但 config 中 `1600_2000.pos_limit_pct = 60%`
+- **根因**：config 更新（v1.16 40→60）后 rules 文档未同步
+- **修复**：更新 rules 第19行和第268行，改为 `1600-2000 → 仓位上限60%`
+- **预防**：config 参数变更必须同步更新 rules 文档；每周六 Bug 巡检增加 rules vs config 一致性检查
+
+## BUG-070：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-02
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-071：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-02
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## 附录A：错误分级（自 error_log.md 迁移）
+
+| 级别 | 名称 | 说明 | 示例 |
+|------|------|------|------|
+| P0 | 阻断 | 任务无法执行/系统崩溃 | Cron未触发、脚本报错退出、数据源不可用 |
+| P1 | 严重 | 数据错误/关键输出错误 | 价格字段取错、复盘点位写反、报告推送失败 |
+| P2 | 中等 | 流程缺陷/不一致 | 步骤顺序不规范、配置未同步、字段映射缺失 |
+| P3 | 轻微 | 体验/格式问题 | 注释不清、日志格式不统一、文档过期 |
+
+---
+
+## 附录B：系统性问题总结（自 error_log.md 迁移）
+
+### 问题1：缺乏字段映射表（ERROR-002）
+
+腾讯API字段索引硬编码在代码中，不同脚本可能有不同的索引理解，没有统一的字段映射常量。
+
+```python
+# 建议：scripts/tencent_api.py
+TENCENT_API_FIELDS = {
+    'NAME': 1, 'CODE': 2, 'PRICE': 3, 'CLOSE': 4,
+    'OPEN': 5, 'HIGH': 6, 'LOW': 7, 'VOLUME': 8, 'AMOUNT': 9,
+}
+
+def parse_stock_data(raw_string):
+    p = raw_string.split('~')
+    return {
+        'price': float(p[TENCENT_API_FIELDS['PRICE']]),
+        'close': float(p[TENCENT_API_FIELDS['CLOSE']]),
+    }
+```
+
+### 问题2：Cron任务步骤顺序不规范（ERROR-005/006）
+
+不同cron任务的步骤顺序不一致，IMA同步可能阻塞推送，缺乏标准的cron任务模板。
+
+### 问题3：配置参数单位不清晰（ERROR-004）
+
+Config中 `max_positions: 5` 表示"5成"，但代码可能被当成"5%"，缺乏单位说明和验证。建议使用显式命名如 `max_positions_cheng` 或 `max_positions_pct`。
+
+---
+
+## 附录C：待办事项（自 error_log.md 迁移）
+
+### 高优先级
+1. 创建 `tencent_api.py` 统一字段映射
+2. 创建 `CRON_TASK_TEMPLATE.md` 规范步骤顺序
+3. 修复CRON_MIDDAY_TASK.md步骤顺序（ERROR-006）
+4. 验证ERROR-002修复
+
+### 中优先级
+5. 为所有关键函数添加单元测试
+6. 为所有cron任务添加步骤顺序审计
+7. 为所有配置参数添加单位说明和验证
+
+### 低优先级
+8. 代码重构：提取硬编码为配置文件
+9. 文档完善：为每个脚本添加字段映射说明
+10. 监控完善：为所有cron任务添加执行状态监控
+
+---
+
+> **迁移记录**：2026-07-02，从 `trading/error_log.md` 迁移至此。错误分级 / 系统性问题总结 / 待办事项三部分为唯一新增内容，ERROR-xxx 条目在 BUG_LOG 中已有覆盖。
+
+## BUG-072：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-03
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-073：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-06
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-074：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-06
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-075：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-06
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---
+
+## BUG-076：market_value 不一致（回归 BUG-010）
+- **日期**：2026-07-07
+- **根因**：sell()/buy() 后未调用 _update_capital_after_trade()
+- **修复**：立即调用 _update_capital_after_trade() 重新计算
+- **预防**：所有 trade 操作后必须调用 _update_capital_after_trade()
+
+---

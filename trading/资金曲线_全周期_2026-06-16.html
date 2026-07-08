@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>龙虾交易系统 · 资金曲线（全周期）</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,'SF Mono','Menlo',monospace;padding:16px}
+  .header{text-align:center;margin-bottom:16px}
+  .header h1{font-size:18px;color:#58a6ff}
+  .header .sub{font-size:11px;color:#8b949e;margin-top:3px}
+  .stats{display:flex;justify-content:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .stat{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 16px;text-align:center;min-width:120px}
+  .stat .label{font-size:10px;color:#8b949e}
+  .stat .value{font-size:16px;font-weight:bold;margin-top:3px}
+  .green{color:#3fb950}.red{color:#f85149}.blue{color:#58a6ff}.yellow{color:#d29922}
+  .chart-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:16px}
+  canvas{width:100%!important;height:320px!important}
+  .sec-title{font-size:13px;color:#58a6ff;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid #30363d}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#161b22;color:#8b949e;font-weight:normal;padding:6px 8px;text-align:left;border-bottom:1px solid #30363d;position:sticky;top:0}
+  td{padding:6px 8px;border-bottom:1px solid #21262d}
+  tr:hover{background:#161b22}
+  .profit{color:#3fb950}.loss{color:#f85149}
+  .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold}
+  .badge-win{background:#238636;color:#fff}
+  .badge-lose{background:#da3633;color:#fff}
+  .info-row{display:flex;gap:16px;font-size:11px;color:#8b949e;margin-bottom:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🦞 龙虾超短交易系统 · 资金曲线（全周期）</h1>
+  <div class="sub">模拟盘 · 初始资金 ¥1,000,000 · 2026-05-26 ~ 06-16 · 共14个交易日</div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="label">总资产（市值）</div><div class="value blue">¥1,015,608</div></div>
+  <div class="stat"><div class="label">累计盈亏</div><div class="value green">+¥15,608 (+1.6%)</div></div>
+  <div class="stat"><div class="label">已实现盈亏</div><div class="value red">-¥22,167</div></div>
+  <div class="stat"><div class="label">浮动盈亏</div><div class="value green">+¥37,775</div></div>
+  <div class="stat"><div class="label">可用现金</div><div class="value">¥637,023</div></div>
+  <div class="stat"><div class="label">持仓市值</div><div class="value">¥378,585</div></div>
+  <div class="stat"><div class="label">总交易笔数</div><div class="value">27笔 (10买17卖)</div></div>
+  <div class="stat"><div class="label">胜率</div><div class="value yellow">41.7% (5/12)</div></div>
+</div>
+
+<div class="info-row">
+  <span>🟢 盈利交易：5笔 合计+¥18,565</span>
+  <span>🔴 亏损交易：7笔 合计-¥40,732</span>
+  <span>📊 最大单笔盈利：金安国纪 +¥6,443</span>
+  <span>📊 最大单笔亏损：达实智能 -¥17,681</span>
+  <span>⏱ 平均持仓天数：2.3天</span>
+</div>
+
+<div class="chart-box">
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="sec-title">📈 每日资金走势</div>
+<table>
+  <thead><tr><th>日期</th><th>可用现金</th><th>持仓成本</th><th>持仓市值</th><th>总资产</th><th>累计盈亏</th><th>当日变动</th></tr></thead>
+  <tbody>
+    <tr><td>05-26</td><td>933,967</td><td>66,016</td><td>66,016</td><td>999,983</td><td class="loss">-17</td><td>—</td></tr>
+    <tr><td>05-27</td><td>804,691</td><td>195,260</td><td>195,260</td><td>999,951</td><td class="loss">-49</td><td class="loss">-32</td></tr>
+    <tr><td>05-28</td><td>872,451</td><td>122,067</td><td>122,067</td><td>994,518</td><td class="loss">-5,482</td><td class="loss">-5,433</td></tr>
+    <tr><td>05-29</td><td>781,578</td><td>220,191</td><td>220,191</td><td>1,001,769</td><td class="profit">+1,769</td><td class="profit">+7,251</td></tr>
+    <tr><td>06-01</td><td>989,713</td><td>0</td><td>0</td><td>989,713</td><td class="loss">-10,287</td><td class="loss">-12,056</td></tr>
+    <tr><td>06-03</td><td>939,811</td><td>49,890</td><td>49,890</td><td>989,701</td><td class="loss">-10,299</td><td class="loss">-12</td></tr>
+    <tr><td>06-04</td><td>987,727</td><td>0</td><td>0</td><td>987,727</td><td class="loss">-12,273</td><td class="loss">-1,974</td></tr>
+    <tr><td>06-08</td><td>887,716</td><td>99,986</td><td>99,986</td><td>987,702</td><td class="loss">-12,298</td><td class="loss">-25</td></tr>
+    <tr><td>06-10</td><td>811,754</td><td>181,632</td><td>181,632</td><td>993,386</td><td class="loss">-6,614</td><td class="profit">+5,684</td></tr>
+    <tr><td>06-11</td><td>800,014</td><td>175,665</td><td>175,665</td><td>975,679</td><td class="loss">-24,321</td><td class="loss">-17,707</td></tr>
+    <tr><td>06-12</td><td>932,376</td><td>38,825</td><td>38,825</td><td>971,201</td><td class="loss">-28,799</td><td class="loss">-4,478</td></tr>
+    <tr><td>06-15</td><td>637,023</td><td>340,536</td><td>340,536</td><td>977,559</td><td class="loss">-22,441</td><td class="profit">+6,358</td></tr>
+    <tr><td style="font-weight:bold">06-16</td><td>637,023</td><td>340,536</td><td>378,585</td><td style="color:#58a6ff">1,015,608</td><td class="profit" style="font-weight:bold">+15,608</td><td class="profit">+38,049</td></tr>
+  </tbody>
+</table>
+
+<div class="sec-title">📋 全部已平仓交易明细</div>
+<table>
+  <thead><tr><th>日期</th><th>股票</th><th>股数</th><th>买入价</th><th>卖出价</th><th>盈亏</th><th>收益率</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td>05-29</td><td>华天科技(002185)</td><td>3,200</td><td>20.63</td><td>20.94</td><td class="profit">+908</td><td class="profit">+1.5%</td><td>止盈</td></tr>
+    <tr><td>05-29</td><td>长电科技(600584)</td><td>2,000</td><td>15.56</td><td>16.05</td><td class="profit">+940</td><td class="profit">+3.2%</td><td>止盈</td></tr>
+    <tr><td>05-28</td><td>博敏电子(603936)</td><td>3,900</td><td>25.16</td><td>23.33</td><td class="loss">-7,251</td><td class="loss">-7.3%</td><td>止损</td></tr>
+    <tr><td>06-01</td><td>粤电力A(000539)</td><td>13,700</td><td>8.91</td><td>8.57</td><td class="loss">-4,805</td><td class="loss">-3.8%</td><td>止损</td></tr>
+    <tr><td>06-04</td><td>工业富联(601138)</td><td>600</td><td>83.15</td><td>79.96</td><td class="loss">-1,974</td><td class="loss">-3.8%</td><td>止损</td></tr>
+    <tr><td>06-10</td><td>豫能控股(001896)</td><td>1,400</td><td>19.87</td><td>20.84</td><td class="profit">+1,322</td><td class="profit">+4.9%</td><td>做T止盈</td></tr>
+    <tr><td>06-10</td><td>豫能控股(001896)</td><td>3,632</td><td>19.87</td><td>21.11</td><td class="profit">+4,408</td><td class="profit">+6.2%</td><td>分时止盈</td></tr>
+    <tr><td>06-11</td><td>达实智能(002421)</td><td>19,300</td><td>5.79</td><td>4.88</td><td class="loss">-17,681</td><td class="loss">-15.7%</td><td>硬止损</td></tr>
+    <tr><td>06-12</td><td>天娱数科(002354)</td><td>12,900</td><td>8.20</td><td>7.51</td><td class="loss">-9,022</td><td class="loss">-8.4%</td><td>硬止损</td></tr>
+    <tr><td>06-12</td><td>金安国纪(002636)</td><td>200</td><td>77.65</td><td>89.06</td><td class="profit">+2,259</td><td class="profit">+14.7%</td><td>做T</td></tr>
+    <tr><td>06-12</td><td>金安国纪(002636)</td><td>200</td><td>77.65</td><td>89.19</td><td class="profit">+2,285</td><td class="profit">+14.8%</td><td>做T</td></tr>
+    <tr><td>06-15</td><td>金安国纪(002636)</td><td>500</td><td>77.65</td><td>90.65</td><td class="profit">+6,443</td><td class="profit">+16.7%</td><td>时间止损</td></tr>
+    <tr style="font-weight:bold;border-top:2px solid #30363d"><td colspan="4">合计</td><td></td><td class="loss">-22,167</td><td></td><td>胜率 41.7% (5/12)</td></tr>
+  </tbody>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const labels = ['05-26','05-27','05-28','05-29','06-01','06-03','06-04','06-08','06-10','06-11','06-12','06-15','06-16'];
+const costData = [999983,999951,994518,1001769,989713,989701,987727,987702,993386,975679,971201,977559,977559];
+const marketData = [999983,999951,994518,1001769,989713,989701,987727,987702,993386,975679,971201,977559,1015608];
+const baseline = labels.map(()=>1000000);
+
+new Chart(document.getElementById('chart'), {
+  type:'line',
+  data:{
+    labels,
+    datasets:[
+      {label:'总资产（成本口径）',data:costData,borderColor:'#8b949e',borderWidth:1.5,borderDash:[5,5],pointRadius:3,tension:0.15},
+      {label:'总资产（市值口径）',data:marketData,borderColor:'#58a6ff',borderWidth:2,pointRadius:4,
+        pointBackgroundColor:ctx=>ctx.raw>=1000000?'#3fb950':'#f85149',tension:0.15,fill:true,
+        backgroundColor:'rgba(88,166,255,0.08)'},
+      {label:'基准 ¥100万',data:baseline,borderColor:'rgba(248,81,73,0.3)',borderWidth:1,borderDash:[3,3],pointRadius:0}
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#c9d1d9',font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': ¥'+ctx.raw.toLocaleString()}}},
+    scales:{
+      x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},
+      y:{ticks:{color:'#8b949e',callback:v=>'¥'+(v/10000).toFixed(1)+'万'},grid:{color:'#21262d'},min:960000,max:1040000}
+    }
+  }
+});
+</script>
+</body>
+</html>

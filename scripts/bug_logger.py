@@ -92,10 +92,11 @@ def check_market_value_consistency(data):
 def check_total_assets_consistency(data):
     """
     检查 total_assets 一致性（防止 BUG-012 再次发生）
-    total_assets = available_cash + market_value
+    total_assets = available + market_value
     """
     capital = data.get("capital", {})
-    available = capital.get("available_cash", 0)
+    # 兼容 available 和 available_cash 两种字段名
+    available = capital.get("available", capital.get("available_cash", 0))
     mv = capital.get("market_value", 0)
     total = capital.get("total_assets", 0)
     

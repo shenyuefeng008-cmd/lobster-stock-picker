@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 龙虾竞价选股 — 过滤脚本 v2.1
-读取 /tmp/lobster_bid_input.json，过滤，输出 /tmp/lobster_bid_result.json
+读取 trading/bid_input.json，过滤，输出 trading/bid_result.json
 修复：字段名"涨跌家数"→"上涨家数"，字典缺逗号语法错误
 """
 
 import json, re, sys
 import os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "lobster-config.json")
 try:
@@ -23,7 +24,7 @@ print("=== 龙虾竞价选股过滤开始 ===\n")
 # ============================================
 print("步骤1：读取输入文件...")
 try:
-    with open("/tmp/lobster_bid_input.json") as f:
+    with open(os.path.join(ROOT, "trading", "bid_input.json")) as f:
         data = json.load(f)
     emotion = data['emotion']
     print(f"✅ 读取成功，日期：{data['date']}")
@@ -98,6 +99,11 @@ for tier_name, candidates in data['candidates'].items():
             _min = _t.get('min_change_pct', 6)
             _max = _t.get('max_change_pct')
             _v = _t.get('min_volume', 1500)
+            # BUG-4修复：冰点收紧时提高最低涨幅门槛（3→6）
+            _ice_tight = stock.get('冰点收紧', False)
+            if _ice_tight:
+                _min = max(_min, 3)  # 冰点期至少高开3%
+                print(f"  {name}({code})：❄️ 冰点收紧，最低涨幅{_min}%")
             if change_pct is not None and _min <= change_pct <= (_max if _max is not None else 9999) and volume >= _v:
                 qualified.append({'name': name, 'code': code, 'change_pct': change_pct, 'volume': volume})
                 print(f"  {name}({code})：✅ 符合（高开{change_pct}%，竞量{volume}手）")
@@ -167,7 +173,7 @@ for tier_name, best in results.items():
         content += f"## {tier_name}\n"
         content += f"- ⚠️ 无符合规则标的\n\n"
 
-content += f"---\n**更新时间**：{data.get('date', today)} 09:25\n**总仓位上限**：{emotion['总仓位上限']}成\n"
+content += f"---\n**更新时间**：{data.get('date', today)} 09:25\n**总仓位上限**：{emotion['总仓位上限']}%\n"
 
 try:
     with open('/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5/trading/关注股.md', 'w') as f:
@@ -216,9 +222,10 @@ try:
             enriched.append(item)
         watch_candidates['candidates'][tier_name] = enriched
     
-    with open('/tmp/lobster_watchlist_candidates.json', 'w') as f:
+    watch_path = os.path.join(ROOT, 'trading', 'watchlist_candidates.json')
+    with open(watch_path, 'w') as f:
         json.dump(watch_candidates, f, ensure_ascii=False, indent=2)
-    print("✅ 关注股JSON已保存到 /tmp/lobster_watchlist_candidates.json")
+    print(f"✅ 关注股JSON已保存到 {watch_path}")
     
     # 输出关注股汇总
     print("\n" + "─" * 30)
@@ -239,7 +246,7 @@ try:
                 print(f"  {dim}: {s.get('名称','?')}({s.get('代码','?')}) ❌竞价未通过(保留监控)")
         if dim_pass == 0 and items:
             pass_str = f"  {dim}: 0/{len(items)}只通过，全部保留监控"
-    print(f"\n总关注股: {total_count}只 | 竞价通过: {pass_count}只 | 仓位上限: {emotion['总仓位上限']}成")
+    print(f"\n总关注股: {total_count}只 | 竞价通过: {pass_count}只 | 仓位上限: {emotion['总仓位上限']}%")
 except Exception as e:
     print(f"❌ 关注股JSON写入失败：{e}")
 
@@ -252,8 +259,9 @@ output = {
     'emotion': emotion,
     'results': results
 }
-with open('/tmp/lobster_bid_result.json', 'w') as f:
+result_path = os.path.join(ROOT, 'trading', 'bid_result.json')
+with open(result_path, 'w') as f:
     json.dump(output, f, ensure_ascii=False, indent=2)
 
-print(f"✅ 结果已保存到 /tmp/lobster_bid_result.json")
+print(f"✅ 结果已保存到 {result_path}")
 print("\n=== 龙虾竞价选股过滤结束 ===")

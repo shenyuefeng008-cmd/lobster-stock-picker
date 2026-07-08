@@ -21,8 +21,22 @@ v2.1 变更：
     5. 写入趋势容量池.md
 """
 
-import json, re, subprocess, sys, datetime
+import json, re, subprocess, sys, datetime, signal, concurrent.futures
 from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
+import functools
+
+# 全局超时控制（秒）
+SCRIPT_TIMEOUT = 120  
+REQUEST_TIMEOUT = 15  
+
+def timeout_handler(signum, frame):
+    print("\n⚠️ 脚本执行超时，强制退出")
+    sys.exit(1)
+
+# 设置全局超时
+signal.signal(signal.SIGALRM, timeout_handler)
+signal.alarm(SCRIPT_TIMEOUT)
 
 WS = Path("/Users/yuefengshen/.qclaw/workspace-1gwpiwf3hr163jz5")
 POOL_PATH = WS / "trading/趋势容量池.md"
@@ -66,45 +80,50 @@ MAX_POOL_SIZE = CFG["max_pool_size"]
 
 
 def get_tencent_kline(code, days=25, fq="qfq"):
-    """获取腾讯日K线"""
+    """获取腾讯日K线（带超时控制）"""
     prefix = "sh" if code.startswith("6") else "sz"
     fq_param = "nofq" if fq == "nofq" else fq
     url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
            f"?_var=kline_day{fq}&param={prefix}{code},day,,,{days},{fq_param}")
-    r = subprocess.run(["curl","-s","--max-time","10",url], capture_output=True, text=True, timeout=12)
-    m = re.search(r"=\s*(\{.+)", r.stdout.strip())
-    if not m: return None
     try:
+        r = subprocess.run(["curl", "-s", "--max-time", str(REQUEST_TIMEOUT), url], 
+                           capture_output=True, text=True, timeout=REQUEST_TIMEOUT + 2)
+        m = re.search(r"=\s*(\{.+)", r.stdout.strip())
+        if not m: return None
         data = json.loads(m.group(1))
         key = f"{prefix}{code}"
-        # Tencent API returns qfqday for most stocks, day for 科创板(688)
         kdata = data["data"].get(key, {})
         for k in [fq + "day", fq, "day"]:
             if k in kdata:
                 return kdata[k]
         return []
-    except: return None
+    except Exception as e:
+        print(f"  ⚠️ K线获取失败 {code}: {e}")
+        return None
 
 
 def get_realtime_amount(code):
-    """获取今日实时成交额（亿元）+ 总市值（亿）"""
+    """获取今日实时成交额（亿元）+ 总市值（亿）（带超时控制）"""
     prefix = "sh" if code.startswith("6") else "sz"
-    r = subprocess.run(["curl","-s","--max-time","8",f"https://qt.gtimg.cn/q={prefix}{code}"],
-                       capture_output=True, timeout=10)
-    raw = r.stdout
-    for enc in ["gb2312","gbk","utf-8","latin1"]:
-        try: txt = raw.decode(enc); break
-        except: continue
-    else:
-        txt = raw.decode("utf-8","replace")
-    m = re.search(rf'v_{prefix}{code}="([^"]*)"', txt)
-    if not m: return None, None
-    parts = m.group(1).split("~")
-    # 成交额(万元) → 亿
-    amt_wan = float(parts[37]) / 10000 if len(parts) > 37 else 0
-    # 总市值(亿) — Tencent qt.gtimg.cn field ~44
-    market_cap = float(parts[44]) if len(parts) > 44 else 0
-    return amt_wan, market_cap
+    url = f"https://qt.gtimg.cn/q={prefix}{code}"
+    try:
+        r = subprocess.run(["curl", "-s", "--max-time", str(REQUEST_TIMEOUT), url],
+                           capture_output=True, timeout=REQUEST_TIMEOUT + 2)
+        raw = r.stdout
+        for enc in ["gb2312", "gbk", "utf-8", "latin1"]:
+            try: txt = raw.decode(enc); break
+            except: continue
+        else:
+            txt = raw.decode("utf-8", "replace")
+        m = re.search(rf'v_{prefix}{code}="([^"]*)"', txt)
+        if not m: return None, None
+        parts = m.group(1).split("~")
+        amt_wan = float(parts[37]) / 10000 if len(parts) > 37 else 0
+        market_cap = float(parts[44]) if len(parts) > 44 else 0
+        return amt_wan, market_cap
+    except Exception as e:
+        print(f"  ⚠️ 实时数据获取失败 {code}: {e}")
+        return None, None
 
 
 def calc_metrics(klines_qfq, klines_nofq):
@@ -157,7 +176,33 @@ def get_track_status():
     return status_map
 
 
-def score_candidate(c, track_status):
+def load_sector_map():
+    """加载动态产业图谱，过热赛道降权"""
+    GRAPH_JSON = WS / "trading/产业图谱.json"
+    if not GRAPH_JSON.exists():
+        print("  ⚠️ 产业图谱.json不存在，跳过热降权")
+        return {}
+    try:
+        data = json.loads(GRAPH_JSON.read_text())
+        sector_map = {}
+        for name, info in data.get('sectors', {}).items():
+            dev = info.get('pool_dev_ma10_median')
+            heat = info.get('dynamic_heat', '🟢')
+            warnings = info.get('warnings', [])
+            sector_map[name] = {
+                'dev_ma10': dev,
+                'heat': heat,
+                'warnings': warnings,
+            }
+        print(f"  产业图谱加载 {len(sector_map)} 个赛道")
+        return sector_map
+    except Exception as e:
+        print(f"  ⚠️ 产业图谱加载失败: {e}")
+        return {}
+
+
+
+def score_candidate(c, track_status, sector_map=None):
     """打分：对齐 scoring_calculator.py 3.0_趋势低吸 模型
 
     产业逻辑强度 30%  → L1(🔴)=30, L2(🟡)=20, L3(🟢)=10, L4=0
@@ -198,6 +243,23 @@ def score_candidate(c, track_status):
     elif status == "🟡": score += 8
     elif status == "🟢": score += 5
 
+    # === 动态产业图谱过热降权（v2.2新增）===
+    if sector_map:
+        sm = sector_map.get(c['track'], {})
+        dev = sm.get('dev_ma10')
+        heat = sm.get('heat', '🟢')
+        # 偏离MA10 > 10% → 过热降权
+        if dev is not None and dev > 10:
+            score = max(0, score - 30)
+            print(f"    ⚠️ {c['name']}({c['track']}) 偏离+{dev:.1f}% → 降权30分 → {score}")
+        elif dev is not None and dev > 5:
+            score = max(0, score - 15)
+            print(f"    ⚠️ {c['name']}({c['track']}) 偏离+{dev:.1f}% → 降权15分 → {score}")
+        # 🟢回调到位加分
+        if dev is not None and dev < 0 and dev > -5:
+            score += 10
+            print(f"    ✅ {c['name']}({c['track']}) 回调到位{dev:.1f}% → 加权10分 → {score}")
+
     return score
 
 
@@ -218,53 +280,79 @@ def main():
     else:
         print("  ⚠️ 未解析到赛道状态，将扫描全部赛道")
 
-    # 2. 遍历所有种子股获取数据（v2.1：增加市值）
+    # 1.5 加载动态产业图谱（v2.2新增）
+    print("\n📋 步骤1.5：加载动态产业图谱...")
+    sector_map = load_sector_map()
+
+    # 2. 遍历所有种子股获取数据（v2.1：增加市值 + 超时控制）
     print(f"\n📊 步骤2：遍历 {len(STOCK_CODE_MAP)} 只种子股（含市值过滤）...")
     print(f"  硬约束：5日均额≥{MIN_AMOUNT}亿 | 总市值≥{MIN_MARKET_CAP}亿")
+    print(f"  单请求超时：{REQUEST_TIMEOUT}s | 总超时：{SCRIPT_TIMEOUT}s")
+    
     all_candidates = []
-
+    failed_stocks = []
+    
     for name, code in STOCK_CODE_MAP.items():
-        klines_qfq = get_tencent_kline(code, 25, "qfq")
-        klines_nofq = get_tencent_kline(code, 10, "nofq")
-        if not klines_qfq or len(klines_qfq) < 15:
+        try:
+            # 设置单只股票处理超时
+            signal.alarm(REQUEST_TIMEOUT * 3)  # 3个请求 × 超时时间
+            
+            klines_qfq = get_tencent_kline(code, 25, "qfq")
+            klines_nofq = get_tencent_kline(code, 10, "nofq")
+            
+            if not klines_qfq or len(klines_qfq) < 15:
+                failed_stocks.append(f"{name}({code}): K线数据不足")
+                signal.alarm(0)
+                continue
+            
+            metrics = calc_metrics(klines_qfq, klines_nofq)
+            if not metrics: 
+                failed_stocks.append(f"{name}({code}): 指标计算失败")
+                signal.alarm(0)
+                continue
+            
+            # 获取实时成交额 + 总市值（腾讯快照）
+            amt_today, market_cap = get_realtime_amount(code)
+            metrics["market_cap"] = market_cap
+            
+            # 找赛道
+            track = None
+            for t, seeds in TRACK_SEEDS.items():
+                if name in seeds: track = t; break
+            if not track: track = "其他"
+            
+            c = {
+                "name": name, "code": code, "track": track,
+                "track_status": track_status.get(track, "🟡"),
+                **metrics
+            }
+            all_candidates.append(c)
+            signal.alarm(0)  # 清除超时
+            
+            if verbose:
+                ok = "✅" if c["ma_ok"] else "❌"
+                amt_ok = "✅" if c["amount_5avg"] >= MIN_AMOUNT else "❌"
+                cap_ok = "✅" if (c.get("market_cap") or 0) >= MIN_MARKET_CAP else "❌"
+                mc_str = f"市值{c['market_cap']}亿" if c.get("market_cap") else "市值N/A"
+                print(f"  {c['track_status']}{ok}{amt_ok}{cap_ok} {name}({code}): "
+                      f"MA5={c['ma5']} MA10={c['ma10']} "
+                      f"5日均额={c['amount_5avg']}亿 {mc_str}")
+                
+        except Exception as e:
+            failed_stocks.append(f"{name}({code}): {e}")
+            signal.alarm(0)
             continue
-
-        metrics = calc_metrics(klines_qfq, klines_nofq)
-        if not metrics: continue
-
-        # 获取实时成交额 + 总市值（腾讯快照）
-        amt_today, market_cap = get_realtime_amount(code)
-        metrics["market_cap"] = market_cap
-
-        # 找赛道
-        track = None
-        for t, seeds in TRACK_SEEDS.items():
-            if name in seeds: track = t; break
-        if not track: track = "其他"
-
-        c = {
-            "name": name, "code": code, "track": track,
-            "track_status": track_status.get(track, "🟡"),
-            **metrics
-        }
-        all_candidates.append(c)
-
-        if verbose:
-            ok = "✅" if c["ma_ok"] else "❌"
-            amt_ok = "✅" if c["amount_5avg"] >= MIN_AMOUNT else "❌"
-            cap_ok = "✅" if (c.get("market_cap") or 0) >= MIN_MARKET_CAP else "❌"
-            mc_str = f"市值{c['market_cap']}亿" if c.get("market_cap") else "市值N/A"
-            print(f"  {c['track_status']}{ok}{amt_ok}{cap_ok} {name}({code}): "
-                  f"MA5={c['ma5']} MA10={c['ma10']} "
-                  f"5日均额={c['amount_5avg']}亿 {mc_str}")
-
+    
     print(f"\n  数据采集完成：{len(all_candidates)} 只有效数据")
+    if failed_stocks and verbose:
+        print(f"  失败 {len(failed_stocks)} 只：")
+        for f in failed_stocks[:5]: print(f"    - {f}")
 
     # 3. 打分排序
     print("\n🏆 步骤3：打分排序...")
     scored = []
     for c in all_candidates:
-        c["score"] = score_candidate(c, track_status)
+        c["score"] = score_candidate(c, track_status, sector_map)
         scored.append(c)
     scored.sort(key=lambda x: x["score"], reverse=True)
 
@@ -332,7 +420,8 @@ def main():
             "score": c["score"], "reason": "均线多头但成交额不足" if c["amount_5avg"] < MIN_AMOUNT else "得分不足"
         } for c in observe[:10]],
     }
-    with open("/tmp/lobster_trend_pool_update.json", "w") as f:
+    update_path = ROOT / "trading" / "trend_pool_update.json"
+    with open(update_path, "w") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     print(f"\n{'='*52}")

@@ -217,7 +217,7 @@ const baoyuMd = require('%s');
 
     try:
         r = subprocess.run(
-            ["node", temp_js],
+            ["/usr/local/bin/node", temp_js],
             capture_output=True, text=True, timeout=30
         )
         if r.returncode != 0:

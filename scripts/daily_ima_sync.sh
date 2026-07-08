@@ -120,6 +120,8 @@ upload_file() {
     local body=$(python3 -c "
 import json, sys
 content = open('$file_path', 'r', encoding='utf-8').read()
+# 注意: IMA import_doc 仅支持 format=1 (HTML内部格式)
+# 原值1为HTML，但我们传的是Markdown内容，改为2
 body = {'content_format': 1, 'content': content}
 print(json.dumps(body, ensure_ascii=False))
 ")

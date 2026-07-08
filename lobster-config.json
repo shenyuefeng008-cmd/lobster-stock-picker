@@ -1,45 +1,64 @@
 {
   "_meta": {
-    "desc": "龙虾选股系统配置 v1.3 — 新增 bid_filter_thresholds（竞价过滤参数可进化）",
-    "version": "1.9",
-    "last_updated": "2026-05-30",
-    "changelog": "v2.5规则参数同步: scoring_models添加top_n, emotion添加三重校验阈值"
+    "desc": "龙虾选股系统配置 v1.13 — 统一百分比表示仓位",
+    "version": "1.20",
+    "last_updated": "2026-06-30",
+    "changelog": "v1.20: 3.0激活区间从2000-2500扩展到2000-3500，稳定区同时支持2.0+1.0+3.0\nv1.16b(2026-06-18): 新增emotion_matrix动态仓位方案A（情绪×维度交叉矩阵），峰哥确认先设后调\nv1.16(2026-06-18): 2000-2500仓位上限40%→70%，市场持续强势仓位过于保守（峰哥决策）\nv1.15: 蒙特卡洛2000次探索调参(2026-06-12)：冰点阈值1500→1600；修复仓位90%→40%；一进二冰点门槛70→78；melt_below 1800→1900；止损参数不变（模拟器BUG，所有模拟止损1%失真）",
+    "config_version": "v1.16b"
   },
   "emotion": {
-    "below_1500": {
-      "dim": "1.0",
-      "aux": "无",
-      "pos_limit": 5,
-      "_note": "冰点区，无辅助"
-    },
-    "1500_2000": {
-      "dim": "1.0",
-      "aux": "无",
-      "pos_limit": 5,
-      "_note": "冰点修复期，3.0熔断（v2.1对齐规则第169行）"
-    },
     "2000_2500": {
       "dim": "1.0",
       "aux": "3.0",
-      "pos_limit": 9,
-      "_note": "情绪修复，可激活3.0（需连续2日>2500确认）"
+      "pos_limit_pct": 90,
+      "_note": "v1.16 06-18: 40->70->90, peak repair zone"
     },
     "2500_3500": {
       "dim": "2.0",
-      "aux": "1.0",
-      "pos_limit": 7
+      "aux": "3.0",
+      "pos_limit_pct": 70,
+      "_note": "v1.20: aux从1.0改为3.0，稳定区同时支持2.0主导+3.0辅助"
     },
     "above_3500": {
       "dim": "辅助",
       "aux": "无",
-      "pos_limit": 2
+      "pos_limit_pct": 20
     },
     "triple_check": {
-      "volatility_threshold": 1500,
+      "volatility_threshold": 1600,
       "extreme_high": 4000,
       "extreme_low": 500,
-      "volume_shrink_penalty_cheng": 1,
-      "_note": "v2.5情绪三重校验参数"
+      "volume_shrink_penalty_pct": 10,
+      "_note": "v2.5情绪三重校验参数：缩量惩罚扣10%仓位"
+    },
+    "ice_tight": {
+      "enabled": true,
+      "thresholds": {
+        "below_1600": {
+          "pos_limit_pct": 30,
+          "1.0_一进二_threshold": 78,
+          "1.0_分歧低吸": "suspend",
+          "_note": "冰点区仓位30%，一进二门槛↑78分(70→78)【v1.15 MC正相关】"
+        },
+        "1600_2000": {
+          "pos_limit_pct": 40,
+          "1.0_一进二_threshold": 72,
+          "1.0_分歧低吸_threshold": 75,
+          "_note": "修复期仓位40%，一进二↑72分(65→72)，分歧低吸↑75分(70→75)【v1.15 MC验证】"
+        }
+      }
+    },
+    "below_1600": {
+      "dim": "1.0",
+      "aux": "无",
+      "pos_limit_pct": 30,
+      "_note": "冰点区(阈值↑1600)，无辅助，仓位上限30%【v1.15 MC验证：ice_thresh正相关，提高入局门槛】"
+    },
+    "1600_2000": {
+      "dim": "1.0",
+      "aux": "无",
+      "pos_limit_pct": 60,
+      "_note": "v1.16 06-18: 40->60, early repair more aggressive"
     }
   },
   "1.0_first_to_second": {
@@ -76,7 +95,7 @@
       "exclude_after": "14:50",
       "_note": "全天确认：≥3家涨停且封板>30分钟；14:50后偷鸡涨停不计入"
     },
-    "score_per_zt": 18,
+    "score_per_zt": 21,
     "score_amount_cap": 30,
     "top_per_sector": 2,
     "top_n": 2
@@ -134,10 +153,10 @@
   },
   "stop_loss": {
     "1.0": {
-      "hard_stop_pct": -5,
+      "hard_stop_pct": -7,
       "time_stop_days": 3,
       "time_stop_condition": "not_zt",
-      "_note": "超短纪律：买入价-5%硬止损；第3日未涨停时间止损"
+      "_note": "超短纪律：买入价-7%硬止损（2026-06-09从-5%放宽，给日内波动空间）；第3日未涨停时间止损"
     },
     "2.0": {
       "hard_stop_pct": -7,
@@ -170,7 +189,8 @@
     "tier1_min_days": 5,
     "tier2_min_days": 3,
     "early_exit_condition": "logic_disproved_only",
-    "_note": "持有期硬约束：Tier-1≥5日、Tier-2≥3日；期间仅逻辑证伪可提前退出"
+    "_note": "v1.17(06-23)：Tier-1≥5日/Tier-2≥3日/最多20日；期间逻辑证伪可提前退出",
+    "max_days": 20
   },
   "3.0_exit_rules": {
     "min_satisfied_items": 4,
@@ -186,23 +206,22 @@
     "enabled": true,
     "辅助_mode": {
       "allow_lowsuck": true,
-      "max_position_cheng": 1,
+      "max_position_pct": 10,
       "only_ma10_lowsuck": true,
       "lowsuck_max_pct": 3,
       "no_chase_limit": true
     },
     "unlock_on_drop_to": 3500,
-    "melt_below": 2000,
+    "melt_below": 1900,
+    "inference_zone": {
+      "low": 1800,
+      "high": 2500,
+      "position_ratio": 0.5,
+      "_note": "推理区：1800-2500，解锁后仓位减半，需四维评分≥3才解锁"
+    },
     "full_activate_above": 2500,
     "full_activate_consecutive_days": 2,
-    "_note": "C+B组合：辅助模式允许MA10回踩低吸(≤1成)；情绪回落<3500自动解锁3.0；<2000熔断"
-  },
-  "ice_freeze": {
-    "freeze_below": 2000,
-    "recover_days": 2,
-    "recover_threshold": 2500,
-    "repair_confirm_threshold": 1700,
-    "_note": "冰点修复确认：连续2日>1700确认修复；连续2日>2500激活3.0"
+    "_note": "C+B组合：辅助模式允许MA10回踩低吸(≤1成)；情绪回落<3500自动解锁3.0；<1800熔断；1800-2500推理区；>2500严格解锁"
   },
   "tracks": [
     "电力",
@@ -770,5 +789,92 @@
       "min_volume": 0,
       "_note": "开盘-2~3%，无竞量要求"
     }
+  },
+  "intraday_take_profit": {
+    "enabled": true,
+    "min_profit_pct": 8.0,
+    "callback_threshold_pct": 8.0,
+    "secondary_high_check": true,
+    "_note": "v1.15(06-12): 盈利>8%才启用分时止盈，回落>8%触发。原因：金安国纪5%卖→错过涨停+20%",
+    "max_hold_days": {
+      "1.0": 5,
+      "2.0": 7,
+      "3.0": 20,
+      "_note": "v1.17(06-23)：3.0趋势低吸可持20天（趋势跟踪逻辑，不应被时间止损打断）"
+    },
+    "max_hold_days_1.0_2.0": 5
+  },
+  "dimensions": {
+    "2.0": {
+      "min_hold_days": 5,
+      "_note": "2026-06-09新增：2.0板块卡位最少持仓2天，避免分时止盈一日游（当前胜率33%）"
+    }
+  },
+  "version": "1.17",
+  "version_note": "2026-06-09: 1.0止损-5%→-7%, 新增分时止盈配置(盈利>5%才启用), 2.0最少持仓2天",
+  "t_trade": {
+    "enabled": true,
+    "min_swing_pct": 3.0,
+    "max_near_low_pct": 1.5,
+    "max_t_ratio": 30,
+    "t_take_profit_pct": 1.5,
+    "min_t_shares": 100,
+    "min_profit_yuan": 200,
+    "_note": "做T配置：振幅>3%才做，距低点<1.5%才买，T仓≤底仓30%，+1.5%止盈，14:30后不做"
+  },
+  "add_position": {
+    "enabled": true,
+    "min_pullback_pct": 1.5,
+    "max_add_ratio": 30,
+    "max_position_pct": 15,
+    "min_add_shares": 100,
+    "max_total_position_pct": 90,
+    "_note": "加仓配置：今天新买的标的回撤>1.5%可加仓，加仓≤原仓30%，单只≤15%，总仓≤90%"
+  },
+  "emotion_matrix": {
+    "below_1600": {
+      "1.0": 8,
+      "2.0": 8,
+      "3.0": 10
+    },
+    "1600_2000": {
+      "1.0": 12,
+      "2.0": 12,
+      "3.0": 15
+    },
+    "2000_2500": {
+      "1.0": 18,
+      "2.0": 18,
+      "3.0": 22
+    },
+    "2500_3500": {
+      "1.0": 15,
+      "2.0": 15,
+      "3.0": 18
+    },
+    "above_3500": {
+      "1.0": 5,
+      "2.0": 5,
+      "3.0": 8
+    }
+  },
+  "3.0_t0_rules": {
+    "enabled": true,
+    "min_hold_days_for_t0": 1,
+    "sell_trigger": {
+      "min_profit_pct": 3.0,
+      "min_bounce_from_low": 2.0,
+      "pct_to_sell": 30
+    },
+    "rebuy_trigger": {
+      "pullback_pct": 1.5,
+      "or_touch_day_low": true
+    },
+    "safety": {
+      "max_t0_per_day": 1,
+      "max_t0_per_week": 2,
+      "retain_min_shares": 200
+    },
+    "_note": "v1.17(06-23)：T+0 = 卖30%后当天跌回买回；3.0需持≥1天后才能T+0；每周最多2次"
   }
 }

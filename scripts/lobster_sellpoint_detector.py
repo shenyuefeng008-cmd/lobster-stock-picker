@@ -55,7 +55,7 @@ def count_trading_days(start_date, end_date):
 
 # ==================== 开盘时间验证 ====================
 def is_trading_time():
-    """检查当前是否在A股交易时间"""
+    """检查当前是否在A股交易时间（含收盘后5分钟窗口，供收盘复核使用）"""
     now = datetime.datetime.now()
     hm = now.strftime("%H:%M")
     
@@ -63,26 +63,46 @@ def is_trading_time():
         return True
     if "09:30" <= hm < "11:30":
         return True
-    if "13:00" <= hm < "15:00":
+    if "13:00" <= hm <= "15:05":
         return True
     return False
 
 if not is_trading_time():
-    print(f"⏸️ 非交易时间 ({datetime.datetime.now().strftime('%H:%M')})，卖点监控跳过")
+    print(f"⏸️ 非交易时间 ({datetime.datetime.now().strftime('%H:%M')})，卖点监控跳过（正常行为，收盘后可运行）")
     sys.exit(0)
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from simulated_trading import sell, status
 
-# 配置（对齐lobster-rules.md v2.3 + 止盈体系）
-STOP_LOSS_PCT_MAP = {
-    '1.0一进二': -5.0,
-    '1.0分歧低吸': -5.0,
-    '2.0板块卡位': -7.0,
-    '3.0趋势低吸': -3.0,
-}
-MAX_HOLD_DAYS = 5  # 最大持仓天数（1.0时间止损：第3个交易日未涨停）
+# 配置（从lobster-config.json读取止损线，支持动态微调）
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'lobster-config.json'
+def _load_stop_loss():
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        sl = cfg.get('stop_loss', {})
+        return {
+            '1.0一进二': sl.get('1.0', {}).get('hard_stop_pct', -7.0),
+            '1.0分歧低吸': sl.get('1.0', {}).get('hard_stop_pct', -7.0),
+            '2.0板块卡位': sl.get('2.0', {}).get('hard_stop_pct', -7.0),
+            '3.0趋势低吸': -3.0,  # 3.0用窄止损
+        }
+    except:
+        return {'1.0一进二': -7.0, '1.0分歧低吸': -7.0, '2.0板块卡位': -7.0, '3.0趋势低吸': -3.0}
+STOP_LOSS_PCT_MAP = _load_stop_loss()
+def _get_dim_max_hold_days(dimension):
+    """从lobster-config.json读取该维度的max_hold_days"""
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        max_days_map = cfg.get('intraday_take_profit', {}).get('max_hold_days', {})
+        for dim_key in ['1.0', '2.0', '3.0']:
+            if dim_key in dimension:
+                return max_days_map.get(dim_key, 5)
+        return 5
+    except:
+        return 5
 
 
 # ==================== 其余代码不变 ====================
@@ -134,7 +154,7 @@ def detect_sellpoint(position, current_price):
     
     # === 按维度止损（对齐lobster-rules.md v2.3）===
     
-    # 1.0硬止损：买入价-5% 或 时间止损（第3天未涨停）
+    # 1.0硬止损：买入价-7% 或 时间止损（第3天未涨停）
     if '1.0' in dimension:
         # 时间止损：第3个交易日未涨停
         if hold_days >= 3 and abs(current_price - buy_price) / buy_price < 0.098:
@@ -142,7 +162,7 @@ def detect_sellpoint(position, current_price):
         # 硬止损
         sl_pct = STOP_LOSS_PCT_MAP.get(dimension, -5.0)
         if pnl_pct <= sl_pct:
-            return f"1.0硬止损：回撤{pnl_pct:.2f}% ≤ {sl_pct:.0f}%（买入价×0.95）", None
+            return f"1.0硬止损：回撤{pnl_pct:.2f}% ≤ {sl_pct:.0f}%（买入价×{1+sl_pct/100:.2f}）", None
     
     # 2.0硬止损：买入价-7%
     if '2.0' in dimension and pnl_pct <= STOP_LOSS_PCT_MAP.get(dimension, -7.0):
@@ -163,9 +183,10 @@ def detect_sellpoint(position, current_price):
         # 这里检查催化兑现/板块分化，简化版输出提示
         return f"3.0 Tier-1止盈观察：浮盈{pnl_pct:.1f}% > 10%，收盘时检查催化兑现/板块分化", None
     
-    # 时间止损（持仓超过N天）
-    if hold_days >= MAX_HOLD_DAYS:
-        return f"时间止损：持仓{hold_days}天 ≥ {MAX_HOLD_DAYS}天", None
+    # 时间止损（按维度从config读取max_hold_days）
+    dim_max_days = _get_dim_max_hold_days(dimension)
+    if hold_days >= dim_max_days:
+        return f"时间止损：持仓{hold_days}天 ≥ {dim_max_days}天(dim:{dimension})", None
     
     return None, f"未触发卖点（盈亏{pnl_pct:+.2f}%，持仓{hold_days}天）"
 
@@ -207,7 +228,14 @@ def run():
         
         if reason:
             # 触发卖点，执行卖出
-            sell_type = "止损" if '止损' in reason else "止盈"
+            # sell_type: 止损关键词→止损, 亏损→止损, 其他→止盈
+            pnl_val = (current_price - position['buy_price']) / position['buy_price'] * 100
+            if '止损' in reason:
+                sell_type = "止损"
+            elif pnl_val < 0:
+                sell_type = "止损"
+            else:
+                sell_type = "止盈"
             result = sell(code, current_price, reason, sell_type)
             triggers.append(f"🔴 卖出 {name}({code}): {reason}")
             print(f"   {result}")

@@ -3,17 +3,23 @@
     "version": 2,
     "purpose": "系统状态·统一文件"
   },
-  "last_updated": "2026-06-01",
-  "last_close_date": "2026-06-01",
+  "last_updated": "2026-07-07",
+  "last_close_date": "2026-07-02",
   "yesterday": {
-    "up_count": 1446,
-    "date": "2026-05-29"
+    "up_count": 755,
+    "date": "2026-06-26"
   },
   "today": {
-    "up_count": 3513,
-    "down_count": 1629,
-    "zt_count": 120,
-    "dt_count": 25,
-    "dimension": "极度高潮"
+    "up_count": 643,
+    "down_count": 4340,
+    "zt_count": 29,
+    "dt_count": 21,
+    "dimension": "1.0+3.0"
+  },
+  "catalyst_scan": {
+    "date": "2026-07-06",
+    "events_in_window": 12,
+    "total_pending": 113,
+    "enriched_stocks": 4
   }
 }

@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "last_update": "2026-05-31",
+  "last_update": "2026-06-06",
   "evolvable": true,
   "catalysts": [
     {
@@ -39,9 +39,9 @@
       "payoff_period": "T1",
       "tradability": 3,
       "source": "产业数据+公司公告",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "半导体板块：国产替代加速，设备/材料/设计多点开花，但部分个股估值偏高"
+      "verified": true,
+      "outcome": "验证通过",
+      "evolution_note": "半导体板块：国产替代加速，设备/材料/设计多点开花，但部分个股估值偏高 | 2026-06-05验证：半导体板块今日有涨停，催化兑现"
     },
     {
       "id": "CAT-20260523-003",
@@ -79,9 +79,9 @@
       "payoff_period": "T1",
       "tradability": 3,
       "source": "公司公告+券商研报",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "AI板块：应用落地加速，但舆情极热，需警惕预期透支"
+      "verified": true,
+      "outcome": "验证通过",
+      "evolution_note": "AI板块：应用落地加速，但舆情极热，需警惕预期透支 | 2026-06-06验证：IT服务3家涨停，催化兑现"
     },
     {
       "id": "CAT-20260523-005",
@@ -99,9 +99,9 @@
       "payoff_period": "T2",
       "tradability": 4,
       "source": "产业数据+政策文件",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "新能源板块：渗透率提升+出海加速，但补贴退坡+竞争加剧"
+      "verified": true,
+      "outcome": "部分兑现",
+      "evolution_note": "新能源板块：渗透率提升+出海加速，但补贴退坡+竞争加剧 | 2026-06-06验证：电网设备3家涨停(部分匹配)，弱兑现"
     },
     {
       "id": "CAT-20260523-006",
@@ -119,9 +119,9 @@
       "payoff_period": "T2",
       "tradability": 3,
       "source": "政策文件+公司公告",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "军工板块：地缘政治紧张+装备换代，但信息不透明，研究难度大"
+      "verified": true,
+      "outcome": "未兑现",
+      "evolution_note": "军工板块：地缘政治紧张+装备换代，但信息不透明 | 2026-06-06验证：航天装备1家涨停(弱)，未达预期，标记未兑现"
     },
     {
       "id": "CAT-20260523-007",
@@ -139,9 +139,9 @@
       "payoff_period": "T2",
       "tradability": 3,
       "source": "券商研报+产业数据",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "医药板块：创新药出海+国产替代，但集采压力+研发风险高"
+      "verified": true,
+      "outcome": "未兑现",
+      "evolution_note": "医药板块：创新药出海+国产替代，但集采压力+研发风险高 | 2026-06-06验证：无相关涨停，标记未兑现"
     },
     {
       "id": "CAT-20260523-008",
@@ -159,9 +159,9 @@
       "payoff_period": "T3",
       "tradability": 2,
       "source": "产业数据",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "消费板块：复苏预期，但居民收入增长放缓+消费信心不足"
+      "verified": true,
+      "outcome": "未兑现",
+      "evolution_note": "消费板块：复苏预期，但居民收入增长放缓 | 2026-06-06验证：一般零售2家(弱信号)，标记未兑现"
     },
     {
       "id": "CAT-20260531-001",
@@ -175,9 +175,9 @@
       "payoff_period": "T2",
       "tradability": 4,
       "source": "AI分析+涨停分布",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "2026-05-31新增：一般零售板块异军突起（8家涨停），消费复苏+新零售模式催化，新增为A级催化剂"
+      "verified": true,
+      "outcome": "验证通过",
+      "evolution_note": "2026-05-31新增：一般零售板块异军突起（8家涨停），消费复苏+新零售模式催化，新增为A级催化剂 | 2026-06-05验证：一般零售板块今日有涨停，催化兑现"
     },
     {
       "id": "CAT-20260531-002",
@@ -191,16 +191,16 @@
       "payoff_period": "T2",
       "tradability": 3,
       "source": "AI分析+涨停分布",
-      "verified": false,
-      "outcome": null,
-      "evolution_note": "2026-05-31新增：房地产开发板块回暖（5家涨停），政策松绑+一线城市成交回升，维持B级观察"
+      "verified": true,
+      "outcome": "验证通过",
+      "evolution_note": "2026-05-31新增，B级观察 | 2026-06-06验证：房地产开3家涨停，催化兑现"
     }
   ],
   "metadata": {
     "total_catalysts": 10,
-    "verified_count": 2,
+    "verified_count": 10,
     "avg_score": 0,
-    "last_verification": "电力",
+    "last_verification": "人工智能/新能源/军工/医药/消费/房地产开发",
     "evolution_log": [
       {
         "date": "2026-05-23",
@@ -211,6 +211,16 @@
         "date": "2026-05-31",
         "action": "AI自动进化更新",
         "note": "电力板块升级为A级（连续强势）；新增一般零售A级催化剂；新增房地产开发B级催化剂"
+      },
+      {
+        "date": "2026-06-05",
+        "action": "AI自动验证催化剂",
+        "note": "验证2个催化剂（半导体6家涨停/一般零售1家涨停）"
+      },
+      {
+        "date": "2026-06-06",
+        "action": "AI自动验证催化剂",
+        "note": "批量验证6个催化剂：人工智能✅、新能源部分兑现、军工/医药/消费未兑现、房地产✅"
       }
     ]
   }

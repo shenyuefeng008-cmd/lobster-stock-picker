@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易报告 2026-06-30</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#1a1a2e;--card-bg:#16213e;--text:#e0e0e0;--text-secondary:#a0a0b0;--green:#00c853;--green-bg:rgba(0,200,83,0.12);--red:#ff1744;--red-bg:rgba(255,23,68,0.12);--orange:#ff9100;--orange-bg:rgba(255,145,0,0.12);--border:#2a2a4a;--accent:#448aff;--font-mono:'SF Mono','Fira Code','Consolas',monospace;--font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.6;min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:24px 20px}
+h1{font-size:28px;font-weight:700;margin-bottom:4px;color:#fff}
+.subtitle{color:var(--text-secondary);margin-bottom:28px;font-size:14px}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:var(--card-bg);border-radius:12px;padding:18px 20px;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,0.25);transition:transform .15s,box-shadow .15s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.35)}
+.stat-card .label{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-card .value{font-size:24px;font-weight:700}
+.stat-card .value.green{color:var(--green)}.stat-card .value.red{color:var(--red)}.stat-card .value.accent{color:var(--accent)}
+.section{background:var(--card-bg);border-radius:14px;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,0.25);margin-bottom:24px;overflow:hidden}
+.section-header{padding:18px 24px;border-bottom:1px solid var(--border);font-size:18px;font-weight:600;color:#fff}
+.section-body{padding:20px 24px}
+.chart-container{position:relative;height:420px;width:100%}
+.chart-note{text-align:center;font-size:12px;color:var(--text-secondary);margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:rgba(68,138,255,0.08);padding:10px 12px;text-align:left;font-weight:600;color:var(--text-secondary);font-size:12px;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid var(--border);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid rgba(42,42,74,0.5)}
+tr:hover td{background:rgba(68,138,255,0.04)}
+tr:nth-child(even) td{background:rgba(255,255,255,0.015)}
+tr:nth-child(even):hover td{background:rgba(68,138,255,0.04)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.code{font-family:var(--font-mono);font-size:12px;color:var(--accent)}
+.text-center{text-align:center}
+tr.buy-row td{background:rgba(0,200,83,0.06)!important}
+tr.sell-profit td{background:rgba(255,145,0,0.07)!important}
+tr.sell-loss td{background:rgba(255,23,68,0.06)!important}
+tr.buy-row:hover td{background:rgba(0,200,83,0.12)!important}
+tr.sell-profit:hover td{background:rgba(255,145,0,0.14)!important}
+tr.sell-loss:hover td{background:rgba(255,23,68,0.12)!important}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-buy{background:var(--green-bg);color:var(--green)}
+.badge-sell{background:var(--red-bg);color:var(--red)}
+.pnl-positive{color:var(--green)}.pnl-negative{color:var(--red)}
+.filter-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:center}
+.filter-bar input,.filter-bar select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:13px;outline:none}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--accent)}
+.filter-bar input{min-width:200px}
+.table-scroll{overflow-x:auto;max-height:600px;overflow-y:auto}
+.pagination{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:16px;flex-wrap:wrap}
+.pagination button{background:var(--card-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;transition:all .15s}
+.pagination button:hover:not(:disabled){background:var(--accent);border-color:var(--accent);color:#fff}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination button.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.pagination .page-info{color:var(--text-secondary);font-size:13px;padding:0 8px}
+@media(max-width:768px){.overview-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 14px}.stat-card .value{font-size:18px}.container{padding:14px 10px}.section-body{padding:12px;overflow-x:auto}.chart-container{height:280px}table{font-size:11px}th,td{padding:6px 8px}}
+.summary-note{font-size:12px;color:var(--text-secondary)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>交易报告</h1>
+<div class="subtitle">报告日期：2026-06-30 | 初始资金：1,000,000 元</div>
+
+<div class="overview-grid">
+<div class="stat-card"><div class="label">初始资金</div><div class="value">1,000,000</div></div>
+<div class="stat-card"><div class="label">总资产</div><div class="value accent">1,132,515</div></div>
+<div class="stat-card"><div class="label">可用资金</div><div class="value">750,137</div></div>
+<div class="stat-card"><div class="label">持仓市值</div><div class="value accent">382,378</div></div>
+<div class="stat-card"><div class="label">已实现盈亏</div><div class="value green">+90,725</div></div>
+<div class="stat-card"><div class="label">浮动盈亏</div><div class="value green">+37,655</div></div>
+<div class="stat-card"><div class="label">总盈亏</div><div class="value green">+132,515</div></div>
+<div class="stat-card"><div class="label">总收益率</div><div class="value green">+13.25%</div></div>
+<div class="stat-card"><div class="label">交易总笔数</div><div class="value">50</div></div>
+<div class="stat-card"><div class="label">胜率</div><div class="value green">64.0%</div></div>
+<div class="stat-card"><div class="label">当前持仓</div><div class="value">3 只</div></div>
+<div class="stat-card"><div class="label">持仓浮动盈亏</div><div class="value green">+37,655</div></div>
+</div>
+
+<div class="section">
+<div class="section-header">资金曲线</div>
+<div class="section-body">
+<div class="chart-container"><canvas id="equityChart"></canvas></div>
+<div class="chart-note">蓝线 = 实时现金 + 已结算盈亏（逐日累计已实现盈亏） | 绿线终点 = 含当前3只持仓浮动盈亏的真实总资产 1,132,515 | 白虚线 = 初始资金基准 100 万</div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-header">月度统计</div>
+<div class="section-body table-scroll">
+<table id="monthlyTable">
+<thead><tr><th>月份</th><th>买入</th><th>卖出</th><th>合计</th><th>已实现盈亏</th><th>胜率</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+
+<div class="section">
+<div class="section-header">全部交易明细</div>
+<div class="section-body">
+<div class="filter-bar">
+<input type="text" id="tradeFilter" placeholder="搜索股票名称/代码...">
+<select id="typeFilter"><option value="all">全部类型</option><option value="BUY">买入</option><option value="SELL">卖出</option></select>
+<span class="summary-note" id="filterSummary"></span>
+</div>
+<div class="table-scroll">
+<table id="tradeTable">
+<thead><tr><th>日期</th><th>时间</th><th>类型</th><th>股票</th><th>代码</th><th>股数</th><th>价格</th><th>金额</th><th>盈亏</th><th>维度</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<div class="pagination" id="tradePagination"></div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-header">当前持仓快照</div>
+<div class="section-body table-scroll">
+<table id="positionTable">
+<thead><tr><th>股票</th><th>代码</th><th>维度</th><th>买入日期</th><th>股数</th><th>成本价</th><th>现价</th><th>市值</th><th>浮动盈亏</th><th>盈亏%</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+<div class="section"><div class="section-header" style="color:var(--green)">盈利 TOP10</div>
+<div class="section-body table-scroll"><table id="profitTopTable"><thead><tr><th>日期</th><th>股票</th><th>代码</th><th>卖出价</th><th>盈亏</th><th>盈亏%</th></tr></thead><tbody></tbody></table></div></div>
+<div class="section"><div class="section-header" style="color:var(--red)">亏损 TOP10</div>
+<div class="section-body table-scroll"><table id="lossTopTable"><thead><tr><th>日期</th><th>股票</th><th>代码</th><th>卖出价</th><th>盈亏</th><th>盈亏%</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+
+</div>
+
+<script>
+var IC=1000000;
+var EC=[{"date":"2026-05-20","realized":1000000,"total":null},{"date":"2026-05-21","realized":999516.28,"total":null},{"date":"2026-05-22","realized":999516.28,"total":null},{"date":"2026-05-25","realized":1024372.47,"total":null},{"date":"2026-05-27","realized":1024372.47,"total":null},{"date":"2026-05-28","realized":1017120.83,"total":null},{"date":"2026-05-29","realized":1020020.66,"total":null},{"date":"2026-06-01","realized":1015214.72,"total":null},{"date":"2026-06-08","realized":1015214.72,"total":null},{"date":"2026-06-10","realized":1020944.09,"total":null},{"date":"2026-06-11","realized":1003263.36,"total":null},{"date":"2026-06-12","realized":996526.42,"total":null},{"date":"2026-06-15","realized":1002969.76,"total":null},{"date":"2026-06-17","realized":1003110.62,"total":null},{"date":"2026-06-18","realized":1015521.1,"total":null},{"date":"2026-06-22","realized":1068095.9,"total":null},{"date":"2026-06-23","realized":1068095.9,"total":null},{"date":"2026-06-24","realized":1064624.14,"total":null},{"date":"2026-06-25","realized":1064624.14,"total":null},{"date":"2026-06-29","realized":1064624.14,"total":null},{"date":"2026-06-30","realized":1090725.31,"total":1132514.78}];
+var TL=[{"date":"2026-05-20","time":"14:24:00","type":"BUY","code":"601126","name":"四方股份","price":86.89,"shares":1100,"amount":95579,"dimension":"2.0-板块卡位"},{"date":"2026-05-20","time":"14:24:30","type":"BUY","code":"002980","name":"华盛昌","price":108.98,"shares":900,"amount":98082,"dimension":"2.0-板块卡位"},{"date":"2026-05-20","time":"14:25:00","type":"BUY","code":"000988","name":"华工科技","price":163.29,"shares":600,"amount":97974,"dimension":"2.0-板块卡位"},{"date":"2026-05-20","time":"14:37:00","type":"BUY","code":"002374","name":"中锐股份","price":3.77,"shares":26500,"amount":99905,"dimension":"1.0-分歧低吸"},{"date":"2026-05-20","time":"14:37:30","type":"BUY","code":"603311","name":"金海高科","price":28.69,"shares":3400,"amount":97546,"dimension":"1.0-分歧低吸"},{"date":"2026-05-21","time":"09:42:50","type":"SELL","code":"601126","name":"四方股份","price":87.7,"shares":1100,"amount":96470,"pnl":744.6,"pnl_pct":0.78,"dimension":"2.0-板块卡位"},{"date":"2026-05-21","time":"09:42:50","type":"SELL","code":"002980","name":"华盛昌","price":108.47,"shares":900,"amount":97623,"pnl":-607.5,"pnl_pct":-0.62,"dimension":"2.0-板块卡位"},{"date":"2026-05-21","time":"09:42:50","type":"SELL","code":"000988","name":"华工科技","price":158.03,"shares":600,"amount":94818,"pnl":-3300.94,"pnl_pct":-3.37,"dimension":"2.0-板块卡位"},{"date":"2026-05-21","time":"09:42:50","type":"SELL","code":"002374","name":"中锐股份","price":3.83,"shares":26500,"amount":101495,"pnl":1436.14,"pnl_pct":1.44,"dimension":"1.0-一进二"},{"date":"2026-05-21","time":"09:42:50","type":"SELL","code":"603311","name":"金海高科","price":29.1,"shares":3400,"amount":98940,"pnl":1243.98,"pnl_pct":1.27,"dimension":"1.0-一进二"},{"date":"2026-05-21","time":"11:53:34","type":"BUY","code":"603989","name":"艾华集团","price":26.08,"shares":11500,"amount":299920,"dimension":"1.0-一进二"},{"date":"2026-05-22","time":"10:40:23","type":"BUY","code":"603938","name":"三孚股份","price":50.73,"shares":4300,"amount":218139,"dimension":"1.0-分歧低吸"},{"date":"2026-05-25","time":"10:24:27","type":"SELL","code":"603938","name":"三孚股份","price":47.1,"shares":4300,"amount":202530,"pnl":-15920.91,"pnl_pct":-7.3,"dimension":"1.0-分歧低吸"},{"date":"2026-05-25","time":"10:24:27","type":"SELL","code":"603989","name":"艾华集团","price":29.67,"shares":11500,"amount":341205,"pnl":40777.1,"pnl_pct":13.59,"dimension":"1.0-一进二"},{"date":"2026-05-27","time":"09:34:48","type":"BUY","code":"603936","name":"博敏电子","price":25.16,"shares":3900,"amount":98124,"dimension":"1.0分歧低吸"},{"date":"2026-05-28","time":"09:35:31","type":"BUY","code":"002185","name":"华天科技","price":20.62,"shares":3200,"amount":65984,"dimension":"1.0分歧低吸"},{"date":"2026-05-28","time":"10:04:04","type":"SELL","code":"603936","name":"博敏电子","price":23.33,"shares":3900,"amount":90987,"pnl":-7251.64,"pnl_pct":-7.39,"dimension":"1.0分歧低吸"},{"date":"2026-05-28","time":"13:32:22","type":"BUY","code":"600584","name":"长电科技","price":85.23,"shares":700,"amount":59661,"dimension":"1.0分歧低吸"},{"date":"2026-05-29","time":"09:37:36","type":"BUY","code":"000539","name":"粤电力Ａ","price":8.91,"shares":13700,"amount":122067,"dimension":"1.0一进二"},{"date":"2026-05-29","time":"09:41:04","type":"SELL","code":"002185","name":"华天科技","price":20.96,"shares":3200,"amount":67072,"pnl":1003.49,"pnl_pct":1.52,"dimension":"1.0分歧低吸"},{"date":"2026-05-29","time":"09:41:04","type":"SELL","code":"600584","name":"长电科技","price":88.05,"shares":700,"amount":61635,"pnl":1896.34,"pnl_pct":3.18,"dimension":"1.0分歧低吸"},{"date":"2026-06-01","time":"09:39:01","type":"SELL","code":"000539","name":"粤电力Ａ","price":8.57,"shares":13700,"amount":117409,"pnl":-4805.94,"pnl_pct":-3.94,"dimension":"1.0一进二"},{"date":"2026-06-08","time":"00:00:00","type":"BUY","code":"001896","name":"豫能控股","price":19.87,"shares":5032,"amount":99986,"dimension":"-"},{"date":"2026-06-10","time":"00:00:00","type":"BUY","code":"002421","name":"达实智能","price":5.79,"shares":19300,"amount":111776,"dimension":"-"},{"date":"2026-06-10","time":"00:00:00","type":"BUY","code":"002636","name":"金安国纪","price":77.65,"shares":900,"amount":69903,"dimension":"-"},{"date":"2026-06-10","time":"14:29:40","type":"SELL","code":"001896","name":"豫能控股","price":20.84,"shares":1400,"amount":29176,"pnl":1321.53,"pnl_pct":4.75,"dimension":"-"},{"date":"2026-06-10","time":"14:45:57","type":"SELL","code":"001896","name":"豫能控股","price":21.11,"shares":3632,"amount":76671.52,"pnl":4407.84,"pnl_pct":6.11,"dimension":"1.0-分歧低吸"},{"date":"2026-06-11","time":"09:31:19","type":"BUY","code":"002354","name":"天娱数科","price":8.2,"shares":12900,"amount":105780,"dimension":"1.0分歧低吸"},{"date":"2026-06-11","time":"09:33:08","type":"SELL","code":"002421","name":"达实智能","price":4.88,"shares":19300,"amount":94184,"pnl":-17680.73,"pnl_pct":-15.82,"dimension":"1.0-一进二"},{"date":"2026-06-12","time":"09:45:54","type":"SELL","code":"002354","name":"天娱数科","price":7.51,"shares":12900,"amount":96879,"pnl":-9022.1,"pnl_pct":-8.53,"dimension":"1.0分歧低吸"},{"date":"2026-06-12","time":"14:00:49","type":"SELL","code":"002636","name":"金安国纪","price":89.19,"shares":200,"amount":17838,"pnl":2285.16,"pnl_pct":14.71,"dimension":"-"},{"date":"2026-06-15","time":"09:30:53","type":"BUY","code":"600500","name":"中化国际","price":7.86,"shares":17700,"amount":139158.17,"dimension":"1.0分歧低吸"},{"date":"2026-06-15","time":"09:32:16","type":"SELL","code":"002636","name":"金安国纪","price":90.65,"shares":500,"amount":45325,"pnl":6443.34,"pnl_pct":16.6,"dimension":"1.0-分歧低吸"},{"date":"2026-06-15","time":"10:30:55","type":"BUY","code":"600487","name":"亨通光电","price":97.46,"shares":1100,"amount":107233.87,"dimension":"3.0趋势低吸"},{"date":"2026-06-15","time":"11:01:45","type":"BUY","code":"600500","name":"中化国际","price":8.27,"shares":4300,"amount":35570.25,"dimension":"1.0-加仓"},{"date":"2026-06-15","time":"11:15:25","type":"BUY","code":"600487","name":"亨通光电","price":98.12,"shares":300,"amount":29443.65,"dimension":"1.0-加仓"},{"date":"2026-06-17","time":"09:31:30","type":"BUY","code":"603738","name":"泰晶科技","price":56.72,"shares":2500,"amount":141836.87,"dimension":"1.0分歧低吸"},{"date":"2026-06-17","time":"13:21:13","type":"SELL","code":"600500","name":"中化国际","price":9.33,"shares":100,"amount":933,"pnl":140.86,"pnl_pct":17.92,"dimension":"-"},{"date":"2026-06-18","time":"09:46:20","type":"SELL","code":"600500","name":"中化国际","price":8.52,"shares":21900,"amount":186352.9,"pnl":12410.48,"pnl_pct":7.13,"dimension":"1.0分歧低吸"},{"date":"2026-06-22","time":"09:47:03","type":"SELL","code":"002636","name":"金安国纪","price":110.19,"shares":200,"amount":22010.23,"pnl":6480.23,"pnl_pct":41.71,"dimension":"unknown"},{"date":"2026-06-22","time":"09:47:06","type":"SELL","code":"600487","name":"亨通光电","price":120.64,"shares":1400,"amount":168683.19,"pnl":32041.19,"pnl_pct":23.44,"dimension":"3.0趋势低吸"},{"date":"2026-06-22","time":"09:47:06","type":"SELL","code":"603738","name":"泰晶科技","price":62.42,"shares":2500,"amount":155853.38,"pnl":14053.38,"pnl_pct":9.91,"dimension":"1.0分歧低吸"},{"date":"2026-06-23","time":"10:34:57","type":"BUY","code":"600487","name":"亨通光电","price":121.67,"shares":800,"amount":97361.31,"dimension":"3.0趋势低吸"},{"date":"2026-06-24","time":"09:34:03","type":"SELL","code":"600487","name":"亨通光电","price":117.51,"shares":800,"amount":93889.55,"pnl":-3471.76,"pnl_pct":-3.56,"dimension":"3.0趋势低吸"},{"date":"2026-06-25","time":"09:32:34","type":"BUY","code":"603989","name":"艾华集团","price":53.8,"shares":2300,"amount":123772.17,"dimension":"1.0一进二"},{"date":"2026-06-29","time":"13:05:05","type":"BUY","code":"603459","name":"红板科技","price":93.02,"shares":2500,"amount":232610.46,"dimension":"1.0分歧低吸"},{"date":"2026-06-30","time":"13:05:07","type":"BUY","code":"002119","name":"康强电子","price":36.4,"shares":1700,"amount":61896.09,"dimension":"2.0板块卡位"},{"date":"2026-06-30","time":"13:05:08","type":"BUY","code":"001389","name":"广合科技","price":221.15,"shares":900,"amount":199086.75,"dimension":"2.0板块卡位"},{"date":"2026-06-30","time":"14:16:08","type":"SELL","code":"603989","name":"艾华集团","price":52.23,"shares":2300,"amount":119977.64,"pnl":-3794.53,"pnl_pct":-3.06,"dimension":"1.0一进二"},{"date":"2026-06-30","time":"14:16:08","type":"SELL","code":"603459","name":"红板科技","price":111.87,"shares":1600,"amount":178992,"pnl":29895.78,"pnl_pct":20.08,"dimension":"-"}];
+var POS=[{"code":"603459","name":"红板科技","buy_date":"2026-06-29","buy_price":93.02,"shares":900,"cost":83739.77,"dimension":"1.0分歧低吸","current_price":112.21,"market_value":100989,"total_pnl":17249.23,"total_pnl_pct":20.6},{"code":"002119","name":"康强电子","buy_date":"2026-06-30","buy_price":36.4,"shares":1700,"cost":61896.09,"dimension":"2.0板块卡位","current_price":39.92,"market_value":67864,"total_pnl":5967.91,"total_pnl_pct":9.64},{"code":"001389","name":"广合科技","buy_date":"2026-06-30","buy_price":221.15,"shares":900,"cost":199086.75,"dimension":"2.0板块卡位","current_price":237.25,"market_value":213525,"total_pnl":14438.25,"total_pnl_pct":7.25}];
+var MS=[{"month":"2026-05","buys":11,"sells":10,"trades":21,"realized_pnl":20020.66,"win_rate":60.0,"win_sells":6,"total_sells":10},{"month":"2026-06","buys":14,"sells":15,"trades":29,"realized_pnl":70704.73,"win_rate":66.7,"win_sells":10,"total_sells":15}];
+var TP=[{"date":"2026-05-25","name":"艾华集团","code":"603989","price":29.67,"pnl":40777.1,"pnl_pct":13.59},{"date":"2026-06-22","name":"亨通光电","code":"600487","price":120.64,"pnl":32041.19,"pnl_pct":23.44},{"date":"2026-06-30","name":"红板科技","code":"603459","price":111.87,"pnl":29895.78,"pnl_pct":20.08},{"date":"2026-06-22","name":"泰晶科技","code":"603738","price":62.42,"pnl":14053.38,"pnl_pct":9.91},{"date":"2026-06-18","name":"中化国际","code":"600500","price":8.52,"pnl":12410.48,"pnl_pct":7.13},{"date":"2026-06-22","name":"金安国纪","code":"002636","price":110.19,"pnl":6480.23,"pnl_pct":41.71},{"date":"2026-06-15","name":"金安国纪","code":"002636","price":90.65,"pnl":6443.34,"pnl_pct":16.6},{"date":"2026-06-10","name":"豫能控股","code":"001896","price":21.11,"pnl":4407.84,"pnl_pct":6.11},{"date":"2026-06-12","name":"金安国纪","code":"002636","price":89.19,"pnl":2285.16,"pnl_pct":14.71},{"date":"2026-05-29","name":"长电科技","code":"600584","price":88.05,"pnl":1896.34,"pnl_pct":3.18}];
+var TL2=[{"date":"2026-06-11","name":"达实智能","code":"002421","price":4.88,"pnl":-17680.73,"pnl_pct":-15.82},{"date":"2026-05-25","name":"三孚股份","code":"603938","price":47.1,"pnl":-15920.91,"pnl_pct":-7.3},{"date":"2026-06-12","name":"天娱数科","code":"002354","price":7.51,"pnl":-9022.1,"pnl_pct":-8.53},{"date":"2026-05-28","name":"博敏电子","code":"603936","price":23.33,"pnl":-7251.64,"pnl_pct":-7.39},{"date":"2026-06-01","name":"粤电力Ａ","code":"000539","price":8.57,"pnl":-4805.94,"pnl_pct":-3.94},{"date":"2026-06-30","name":"艾华集团","code":"603989","price":52.23,"pnl":-3794.53,"pnl_pct":-3.06},{"date":"2026-06-24","name":"亨通光电","code":"600487","price":117.51,"pnl":-3471.76,"pnl_pct":-3.56},{"date":"2026-05-21","name":"华工科技","code":"000988","price":158.03,"pnl":-3300.94,"pnl_pct":-3.37},{"date":"2026-05-21","name":"华盛昌","code":"002980","price":108.47,"pnl":-607.5,"pnl_pct":-0.62}];
+
+// ========== CHART ==========
+(function(){
+var ctx=document.getElementById('equityChart').getContext('2d');
+var labels=EC.map(function(e){return e.date;});
+// Line 1: 已实现盈亏曲线（蓝线）
+var realizedData=EC.map(function(e){return e.realized;});
+// Line 2: 含浮动的总资产（绿线 - 只有最后一天有值，前面用null）
+var totalData=EC.map(function(e){return e.total;});
+// Line 3: 初始资金基准线
+var baselineData=EC.map(function(){return IC;});
+
+new Chart(ctx,{
+type:'line',
+data:{
+labels:labels,
+datasets:[
+{label:'已实现盈亏曲线',data:realizedData,borderColor:'#448aff',backgroundColor:'rgba(68,138,255,0.06)',borderWidth:2.5,fill:true,tension:0.3,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#448aff',order:3},
+{label:'含浮动总资产',data:totalData,borderColor:'#00c853',backgroundColor:'rgba(0,200,83,0.08)',borderWidth:2.5,borderDash:[],fill:false,tension:0,pointRadius:5,pointHoverRadius:8,pointBackgroundColor:'#00c853',pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:false,order:2},
+{label:'初始资金基准',data:baselineData,borderColor:'rgba(255,255,255,0.25)',borderWidth:1.5,borderDash:[8,4],fill:false,pointRadius:0,order:1}
+]
+},
+options:{
+responsive:true,maintainAspectRatio:false,
+interaction:{mode:'index',intersect:false},
+plugins:{
+legend:{labels:{color:'#a0a0b0',usePointStyle:true,padding:20,font:{size:12}}},
+tooltip:{backgroundColor:'#16213e',titleColor:'#fff',bodyColor:'#e0e0e0',borderColor:'#2a2a4a',borderWidth:1,callbacks:{label:function(c){var v=c.parsed.y;if(v===null)return c.dataset.label+': (无数据)';return c.dataset.label+': '+Math.round(v).toLocaleString('en-US')+' 元';}}}
+},
+scales:{
+x:{ticks:{color:'#a0a0b0',font:{size:11},maxTicksLimit:14},grid:{color:'rgba(42,42,74,0.4)'}},
+y:{ticks:{color:'#a0a0b0',font:{size:11},callback:function(v){return (v/10000).toFixed(0)+'万';}},grid:{color:'rgba(42,42,74,0.4)'}}
+}
+}
+});
+})();
+
+// ========== HELPERS ==========
+function F(n){if(n==null)return'-';return Math.abs(n)>=1?Math.round(n).toLocaleString('en-US'):Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function FP(n){if(n==null)return'-';return (n>0?'+':'')+F(n);}
+function FPCT(n){if(n==null)return'-';return (n>0?'+':'')+Number(n).toFixed(2)+'%';}
+
+// ========== MONTHLY TABLE ==========
+(function(){
+var t=document.querySelector('#monthlyTable tbody');
+MS.forEach(function(m){
+var r=document.createElement('tr');
+r.innerHTML='<td>'+m.month+'</td><td class="text-center">'+m.buys+'</td><td class="text-center">'+m.sells+'</td><td class="text-center">'+m.trades+'</td><td class="num '+(m.realized_pnl>=0?'pnl-positive':'pnl-negative')+'">'+FP(m.realized_pnl)+'</td><td class="text-center">'+m.win_rate.toFixed(1)+'% ('+m.win_sells+'/'+m.total_sells+')</td>';
+t.appendChild(r);
+});
+})();
+
+// ========== TRADE TABLE ==========
+var PS=20,CP=1,FT=TL.slice();
+function RT(){
+var t=document.querySelector('#tradeTable tbody');t.innerHTML='';
+var s=(CP-1)*PS,p=FT.slice(s,s+PS);
+p.forEach(function(x){
+var b=x.type==='BUY',pn=x.pnl!=null?x.pnl:null;
+var rc=b?'buy-row':(pn!=null&&pn>=0?'sell-profit':'sell-loss');
+var bg=b?'<span class="badge badge-buy">买入</span>':'<span class="badge badge-sell">卖出</span>';
+var ps=pn!=null?'<span class="'+(pn>=0?'pnl-positive':'pnl-negative')+'">'+FP(pn)+'</span>':'-';
+var dm=x.dimension||'-',ts=x.time||'-';
+var r=document.createElement('tr');r.className=rc;
+r.innerHTML='<td>'+x.date+'</td><td>'+ts+'</td><td>'+bg+'</td><td>'+x.name+'</td><td class="code">'+x.code+'</td><td class="num">'+F(x.shares)+'</td><td class="num">'+F(x.price)+'</td><td class="num">'+F(x.amount)+'</td><td class="num">'+ps+'</td><td>'+dm+'</td>';
+t.appendChild(r);
+});
+document.getElementById('filterSummary').textContent='共 '+FT.length+' 条'+(FT.length!==TL.length?' (已筛选，全部 '+TL.length+' 条)':'');
+RP();
+}
+function RP(){
+var tp=Math.ceil(FT.length/PS),c=document.getElementById('tradePagination');c.innerHTML='';
+if(tp<=1)return;
+function B(tx,pg,d,a){
+var b=document.createElement('button');b.textContent=tx;if(d)b.disabled=true;if(a)b.classList.add('active');
+b.onclick=function(){CP=pg;RT();};c.appendChild(b);
+}
+B('«',1,CP===1);B('‹',CP-1,CP===1);
+var st=Math.max(1,CP-3),en=Math.min(tp,CP+3);
+if(st>1){var s=document.createElement('span');s.textContent='...';s.style.color='#a0a0b0';c.appendChild(s);}
+for(var i=st;i<=en;i++)B(String(i),i,false,i===CP);
+if(en<tp){var s2=document.createElement('span');s2.textContent='...';s2.style.color='#a0a0b0';c.appendChild(s2);}
+B('›',CP+1,CP===tp);B('»',tp,CP===tp);
+var inf=document.createElement('span');inf.className='page-info';inf.textContent='第 '+CP+'/'+tp+' 页';c.appendChild(inf);
+}
+function AF(){
+var q=document.getElementById('tradeFilter').value.toLowerCase();
+var ty=document.getElementById('typeFilter').value;
+FT=TL.filter(function(x){return (!q||x.name.toLowerCase().indexOf(q)>-1||x.code.indexOf(q)>-1)&&(ty==='all'||x.type===ty);});
+CP=1;RT();
+}
+document.getElementById('tradeFilter').addEventListener('input',AF);
+document.getElementById('typeFilter').addEventListener('change',AF);
+
+// ========== POSITIONS ==========
+(function(){
+var t=document.querySelector('#positionTable tbody');
+POS.forEach(function(p){
+var pn=p.total_pnl||0,pp=p.total_pnl_pct||0;
+var r=document.createElement('tr');
+r.innerHTML='<td>'+p.name+'</td><td class="code">'+p.code+'</td><td>'+(p.dimension||'-')+'</td><td>'+(p.buy_date||'-')+'</td><td class="num">'+F(p.shares)+'</td><td class="num">'+F(p.buy_price)+'</td><td class="num">'+F(p.current_price)+'</td><td class="num">'+F(p.market_value)+'</td><td class="num '+(pn>=0?'pnl-positive':'pnl-negative')+'">'+FP(pn)+'</td><td class="num '+(pp>=0?'pnl-positive':'pnl-negative')+'">'+FPCT(pp)+'</td>';
+t.appendChild(r);
+});
+})();
+
+// ========== TOP TABLES ==========
+function RT2(id,d){
+var t=document.querySelector(id);
+d.forEach(function(x){
+var pn=x.pnl||0,pp=x.pnl_pct||0;
+var r=document.createElement('tr');
+r.innerHTML='<td>'+x.date+'</td><td>'+x.name+'</td><td class="code">'+x.code+'</td><td class="num">'+F(x.price)+'</td><td class="num '+(pn>=0?'pnl-positive':'pnl-negative')+'">'+FP(pn)+'</td><td class="num '+(pp>=0?'pnl-positive':'pnl-negative')+'">'+FPCT(pp)+'</td>';
+t.appendChild(r);
+});
+}
+RT2('#profitTopTable tbody',TP);
+RT2('#lossTopTable tbody',TL2);
+RT();
+</script>
+</body>
+</html>

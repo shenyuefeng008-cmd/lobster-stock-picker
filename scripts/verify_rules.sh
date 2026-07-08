@@ -78,10 +78,10 @@ check_cron_task() {
 
 # cron任务文件实际在 scripts/cron-tasks/ 目录
 check_cron_task "$SCRIPTS/cron-tasks/CRON_PREMARKET_TASK.md" "盘前选股(v4硬脚本,无需引用rules)"
-check_cron_task "$SCRIPTS/cron-tasks/CRON_BID_TASK.md" "竞价选股(v9硬脚本,无需引用rules)"
-check_cron_task "$SCRIPTS/cron-tasks/CRON_BUYPOINT_TASK.md" "买点监控"
+check_cron_task "$SCRIPTS/cron-tasks/CRON_BID_FULL_PIPELINE.md" "竞价选股(v9硬脚本,无需引用rules)"
+check_cron_task "$SCRIPTS/cron-tasks/CRON_INTRADAY_PATROL_TASK.md" "盘中巡检(买卖点监控)"
 check_cron_task "$SCRIPTS/cron-tasks/CRON_MIDDAY_TASK.md" "午间复盘"
-check_cron_task "$SCRIPTS/cron-tasks/CRON_CLOSING_TASK.md" "收盘复盘"
+check_cron_task "$SCRIPTS/cron-tasks/CRON_CLOSING_COMPREHENSIVE.md" "收盘综合任务"
 check_cron_task "$SCRIPTS/cron-tasks/CRON_DAILY_EVOLUTION_TASK.md" "每日进化"
 
 echo ""

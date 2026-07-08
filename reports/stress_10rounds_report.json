@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-06-26T17:19:40.037820",
+  "errors": 11,
+  "warns": 0,
+  "orphans": 0,
+  "errors_detail": [
+    "tencent_qt #1: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #2: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #3: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #4: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #5: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #6: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #7: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #8: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #9: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "tencent_qt #10: rc=1 err=/Users/yuefengshen/Library/Application Support/com.tencent.m",
+    "闭环断裂"
+  ],
+  "warns_detail": []
+}

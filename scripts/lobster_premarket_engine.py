@@ -2,16 +2,22 @@
 """
 龙虾盘前选股引擎 v1.0 — 确定性硬脚本
 数据源：legulegu(涨跌家数) + qt.gtimg.cn(指数) + akshare(涨停池/连板池) + 趋势容量池.md(3.0)
-输出：/tmp/lobster_premarket_candidates.json + stdout
+输出：trading/premarket_candidates.json + stdout
 
-用法：python3 /tmp/lobster_premarket_engine_v1.py
+用法：python3 scripts/lobster_premarket_engine.py
 """
 
-import json, subprocess, re, sys, datetime, os
+import json, subprocess, re, sys, datetime, os, time
 from pathlib import Path
+
+# node 二进制路径（shell executor 的 PATH 不含 /usr/local/bin）
+_NODE = '/usr/local/bin/node'
+# financial-analysis skill 路径常量（避免四处硬编码）
+_FIN_ANALYSIS = os.path.expanduser('~/.qclaw/skills/financial-analysis')
 
 # 确保scripts/目录在sys.path，使catalyst_scoring可被import
 SCRIPT_DIR = Path(__file__).parent
+ROOT = SCRIPT_DIR.parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -30,11 +36,11 @@ CONFIG_PATH = Path(__file__).parent.parent / 'lobster-config.json'
 # 内置默认值（仅当配置文件不存在时使用）
 _DEFAULT_CONFIG = {
     'emotion': {
-        'below_1500': {'dim': '1.0', 'aux': '无', 'pos_limit': 5},
-        '1500_2000': {'dim': '1.0', 'aux': '无', 'pos_limit': 5},
-        '2000_2500': {'dim': '1.0', 'aux': '3.0', 'pos_limit': 9},
-        '2500_3500': {'dim': '2.0', 'aux': '1.0', 'pos_limit': 7},
-        'above_3500': {'dim': '辅助', 'aux': '无', 'pos_limit': 2},
+        'below_1600': {'dim': '1.0', 'aux': '无', 'pos_limit_pct': 30},
+        '1600_2000': {'dim': '1.0', 'aux': '无', 'pos_limit_pct': 40},
+        '2000_2500': {'dim': '1.0', 'aux': '3.0', 'pos_limit_pct': 90},
+        '2500_3500': {'dim': '2.0', 'aux': '1.0', 'pos_limit_pct': 70},
+        'above_3500': {'dim': '辅助', 'aux': '无', 'pos_limit_pct': 20},
     }
 }
 
@@ -74,28 +80,59 @@ def get_index():
     return indices
 
 def get_advance_decline():
-    raw = run(
-        "curl -s -L --max-time 15 "
-        "-A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' "
-        "'https://legulegu.com/stockdata/market-activity'",
-        timeout=20
-    )
-    m = re.search(r'content="(2026-[^"]+)"', raw)
-    if not m:
-        return None
-    text = m.group(1)
-    result = {}
-    m2 = re.search(r'(\d+)家上涨[，,]\s*(\d+)家下跌', text)
-    if m2:
-        result['up'] = int(m2.group(1))
-        result['down'] = int(m2.group(2))
-    m3 = re.search(r'(\d+)家涨停', text)
-    if m3:
-        result['zt'] = int(m3.group(1))
-    m4 = re.search(r'(\d+)家跌停', text)
-    if m4:
-        result['dt'] = int(m4.group(1))
-    return result if 'up' in result else None
+    """获取涨跌家数（主动采集+缓存+存档兜底+默认值）"""
+    sent_file = ROOT / 'trading' / 'sentiment_cache.json'
+    CACHE_TTL = 1800  # 30分钟，与 get_market_sentiment.py 对齐
+
+    # 0. 检查缓存是否有效，无效则主动采集
+    cache_fresh = False
+    if sent_file.exists():
+        try:
+            with open(sent_file) as f:
+                sent = json.load(f)
+            age = time.time() - sent.get('timestamp', 0)
+            if age < CACHE_TTL and sent.get('up', 0) > 0:
+                cache_fresh = True
+        except Exception:
+            pass
+
+    if not cache_fresh:
+        try:
+            print("  🔄 情绪缓存过期/不存在，主动采集...", file=sys.stderr)
+            from get_market_sentiment import get_market_sentiment
+            get_market_sentiment(use_cache=False)  # 强制采集并写入缓存
+        except Exception as e:
+            print(f"  ⚠️ 主动采集失败: {e}", file=sys.stderr)
+
+    # 1. 从缓存读取（刚写入或已有效）
+    if sent_file.exists():
+        try:
+            with open(sent_file) as f:
+                sent = json.load(f)
+            if sent.get('up', 0) > 0:
+                print(f"  📡 涨跌家数(实时): {sent['up']}涨/{sent.get('down',0)}跌", file=sys.stderr)
+                return {'up': sent['up'], 'down': sent.get('down', 0),
+                        'zt': sent.get('zt', 0), 'dt': sent.get('dt', 0)}
+        except Exception:
+            pass
+
+    # 2. 尝试从系统状态读昨日数据
+    state_path = Path(__file__).resolve().parent.parent / "trading" / "系统状态.json"
+    if state_path.exists():
+        try:
+            with open(state_path) as f:
+                state = json.load(f)
+            yesterday = state.get('yesterday', {})
+            if yesterday.get('up_count', 0) > 0:
+                print(f"  📡 涨跌家数(系统状态): {yesterday['up_count']}涨/{yesterday.get('down_count',0)}跌", file=sys.stderr)
+                return {'up': yesterday['up_count'], 'down': yesterday.get('down_count', 0),
+                        'zt': yesterday.get('zt_count', 0), 'dt': yesterday.get('dt_count', 0)}
+        except Exception:
+            pass
+
+    # 3. 兜底默认值（中性情绪）
+    print("  ⚠️ 涨跌家数: 无数据源，使用默认中性值(2500涨/2000跌)", file=sys.stderr)
+    return {'up': 2500, 'down': 2000, 'zt': 0, 'dt': 0}
 
 def get_yesterday_date():
     today = datetime.date.today()
@@ -109,25 +146,329 @@ def get_yesterday_zt():
     """昨日涨停池（股票昨天涨停，今天的表现）"""
     yesterday = get_yesterday_date()
     date_str = yesterday.strftime('%Y%m%d')
+    
+    # ===== 数据源1: westock-data 昨日涨停板块（最稳定）=====
+    try:
+        westock_script = str(Path(__file__).parent.parent / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        if not Path(westock_script).exists():
+            westock_script = str(Path.home() / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        if Path(westock_script).exists():
+            raw = run(f'{_NODE} "{westock_script}" sector pt02031283', timeout=15)
+            if raw and '只' in raw:
+                # 解析Markdown表格
+                zt_list = []
+                for line in raw.split('\n'):
+                    if line.startswith('|') and ('sh' in line or 'sz' in line or 'bj' in line):
+                        parts = [p.strip() for p in line.split('|')]
+                        if len(parts) >= 3 and parts[1]:
+                            code = parts[1]  # e.g. sh603407
+                            name = parts[2]  # e.g. 长裕集团
+                            code_pure = code[2:] if len(code) > 2 else code  # 去掉sh/sz前缀
+                            # 过滤ST/*ST股
+                            if 'ST' in name or 'st' in name.lower():
+                                continue
+                            zt_list.append({
+                                '代码': code_pure,
+                                '名称': name,
+                                'market_code': code,  # 保留完整代码如sh603407
+                                '昨日连板数': 1,  # 板块接口不提供连板数，默认1（首板）
+                                '涨停统计': 1,
+                                '所属行业': '',  # 后续从行情补充
+                                '成交额': 0,
+                                '_source': 'westock-sector'
+                            })
+                if zt_list:
+                    print(f"  ✅ 昨日涨停池(westock): {len(zt_list)}只", file=sys.stderr)
+                    # 用westock-data批量获取涨跌幅/成交额
+                    _enrich_zt_with_quote(zt_list)
+                    return zt_list, yesterday.strftime('%Y-%m-%d')
+    except Exception as e:
+        print(f"  ⚠️ westock-data涨停池失败: {e}", file=sys.stderr)
+    
+    # ===== 数据源2: akshare（备用）=====
     try:
         raw = run(f"python3 -c \"import akshare as ak, warnings; warnings.filterwarnings('ignore'); df=ak.stock_zt_pool_previous_em(date='{date_str}'); print(df.to_json(orient='records',force_ascii=False))\"")
         if raw:
-            return json.loads(raw), yesterday.strftime('%Y-%m-%d')
+            result = json.loads(raw)
+            if result:
+                print(f"  ✅ 昨日涨停池(akshare): {len(result)}只", file=sys.stderr)
+                return result, yesterday.strftime('%Y-%m-%d')
+            else:
+                print(f"  ⚠️ akshare涨停池返回空", file=sys.stderr)
     except Exception as e:
-        print(f"  ⚠️ 昨日涨停池获取失败: {e}", file=sys.stderr)
+        print(f"  ⚠️ akshare涨停池获取失败: {e}", file=sys.stderr)
+    
+    print(f"  ❌ 所有涨停池数据源均失败！", file=sys.stderr)
     return [], yesterday.strftime('%Y-%m-%d')
 
+def _enrich_zt_with_quote(zt_list):
+    """用westock-data K线获取涨停股的涨跌幅/成交额"""
+    # 策略：只enrich连板股（2板以上），首板跳过（量太大）
+    # 连板数通过连板池交叉推断，不依赖K线
+    try:
+        westock_script = str(Path(__file__).parent.parent / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        if not Path(westock_script).exists():
+            westock_script = str(Path.home() / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        
+        # 只enrich连板>=2的股票（从连板池来）
+        to_enrich = [s for s in zt_list if s.get('昨日连板数', 1) >= 2]
+        enriched = 0
+        for s in to_enrich[:20]:  # 最多enrich前20只连板股
+            mc = s.get('market_code', '')
+            if not mc:
+                continue
+            try:
+                raw = run(f'{_NODE} "{westock_script}" kline {mc} --period day --limit 3', timeout=8)
+                if not raw:
+                    continue
+                lines = [l for l in raw.split('\n') if l.startswith('|') and 'date' not in l and '---' not in l]
+                if len(lines) >= 2:
+                    parts = [p.strip() for p in lines[-2].split('|')]
+                    if len(parts) >= 8:
+                        try:
+                            s['成交额'] = float(parts[8])
+                            enriched += 1
+                        except:
+                            pass
+            except:
+                continue
+        if enriched > 0:
+            print(f"  ✅ 连板股K线补充: {enriched}/{len(to_enrich)}只", file=sys.stderr)
+    except Exception as e:
+        print(f"  ⚠️ 涨停股行情补充失败: {e}", file=sys.stderr)
+
+
+def fetch_hot_sectors():
+    """从华泰 marketInsight 获取昨日板块涨幅TOP10，作为动态赛道快照。内置缓存避免重复调用。"""
+    if hasattr(fetch_hot_sectors, '_cache'):
+        return fetch_hot_sectors._cache
+    import os
+    hot_sectors = []
+    try:
+        htsc_config = os.path.expanduser('~/.htsc-skills/config')
+        with open(htsc_config) as f:
+            for line in f:
+                if '=' in line:
+                    k, v = line.strip().split('=', 1)
+                    if k == 'HT_APIKEY':
+                        os.environ['HT_APIKEY'] = v
+                        break
+        r = subprocess.run([
+            'python3', os.path.expanduser('~/.qclaw/skills/financial-analysis/financial_analysis.py'),
+            'marketInsight', '--query', '昨天A股行业板块涨幅排名 TOP10 板块名称'
+        ], capture_output=True, text=True, timeout=30,
+           cwd=os.path.expanduser('~/.qclaw/skills/financial-analysis'))
+        out = r.stdout + r.stderr
+        # 先尝试解析 JSON 提取 answer 字段（华泰 API 返回 JSON 格式）
+        import re
+        hot_sectors = []
+        try:
+            data = json.loads(r.stdout)
+            answer = data.get('data', {}).get('answer', '')
+            if answer:
+                # answer 格式: "1. 煤炭涨跌幅为3.05%；\n2. 船舶制造涨跌幅为2.69%；..."
+                found = re.findall(r'\d+[.、]\s*([^\d\s]+?)涨跌幅', answer)
+                hot_sectors = [f.strip() for f in found if len(f.strip()) >= 2]
+        except (json.JSONDecodeError, KeyError):
+            # JSON 解析失败，回退到原始正则扫描
+            pass
+        if not hot_sectors:
+            # 兜底：原始关键字正则（兼容旧格式 "煤炭板块 +3.05%"）
+            found = re.findall(r'\d+[.、]\s*([^\s]+(?:板块|行业|制造|医药|科技|汽车|光伏|储能|军工|半导体|消费|地产|金融|电力|有色|化工|钢铁|煤炭|农业|环保|通信|计算机|传媒|教育|旅游|物流|纺织|服装|家电|食品|饮料|白酒|医疗器械|医疗服务|生物制品|中药|化学制药|创新药|CXO|机器人|AI|人工智能|数字经济|信创|元宇宙|数据要素|算力|芯片|电子|光学|光电子|元件|PCB|面板|软件|游戏|影视|动漫|出版|教育|交通运输|建筑|建材|水泥|玻璃|家居|造纸|包装|零售|贸易|餐饮|酒店|航空|机场|港口|公路|铁路|船舶|航天|军工电子|核电|风电|水电|火电|电网|充电桩|锂电|钠电|固态电池|储能|氢能|光伏组件|逆变器|有机硅|稀土|磁材|钨|钼|铜|铝|黄金|白银|油气|天然气|航运|造船|重工|机械|机床|机器人零部件|传感器|减速器|伺服|PLC|工控|自动化|检测|仪器|仪表|科学仪器|3D打印|新材料|碳纤维|钛合金|高温合金|特钢|不锈钢|有色冶炼|加工|压铸|模具|紧固件|轴承|齿轮|弹簧|阀门|泵|压缩机|风机|电机|变压器|开关|电缆|光纤|光缆|通信模组|天线|滤波器|连接器|射频|基带|芯片设计|晶圆|封测|EDA|IP|光刻|刻蚀|薄膜|清洗|检测设备|零部件|材料|特种气体|光刻胶|抛光|靶材))', out)
+            hot_sectors = [f[0] for f in found] if found else []
+        print(f"  📡 华泰板块涨幅TOP10: {hot_sectors[:10]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  ⚠️ 华泰板块涨幅获取失败: {e}", file=sys.stderr)
+        hot_sectors = []
+    
+    # 兜底：如果华泰失败，用 westock-data 获取申万二级行业涨幅排行
+    if not hot_sectors:
+        try:
+            westock_script = str(Path(__file__).parent.parent / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+            if not Path(westock_script).exists():
+                westock_script = str(Path.home() / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+            raw = run(f'{_NODE} "{westock_script}" sector --rank interval_chg_rank_sw2', timeout=15)
+            if raw:
+                # 格式: | 1 | pt01801044 | 普钢 | 1.52 | ... → 提取第3列板块名称
+                import re
+                found = re.findall(r'\|\s*\d+\s*\|[^|]+\|\s*([^|]+?)\s*\|', raw)
+                hot_sectors = [f.strip() for f in found if len(f.strip()) >= 2 and not f.strip().isdigit()][:10]
+        except:
+            pass
+    
+    # 导出快照供 buyoint_detector 使用
+    try:
+        snap = {'timestamp': datetime.datetime.now().isoformat(), 'hot_sectors': hot_sectors[:10]}
+        hot_path = ROOT / 'trading' / 'hot_sectors.json'
+        with open(hot_path, 'w') as f:
+            json.dump(snap, f, ensure_ascii=False)
+        print(f"  ✅ 赛道快照已写入 {hot_path}", file=sys.stderr)
+    except:
+        pass
+    
+    fetch_hot_sectors._cache = hot_sectors
+    return hot_sectors
+
+
+def _enrich_zt_sector(zt_list):
+    """用westock-data申万行业成分股反向匹配，给涨停池补所属行业。动态合并华泰热点赛道。"""
+    hot_sectors = fetch_hot_sectors()  # 获取当日热点赛道
+    try:
+        westock_script = str(Path(__file__).parent.parent / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        if not Path(westock_script).exists():
+            westock_script = str(Path.home() / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        
+        # 涨停池代码集合
+        zt_codes = set()
+        for s in zt_list:
+            mc = s.get('market_code', '')
+            if mc:
+                zt_codes.add(mc)
+        
+        # 核心赛道：config静态 + 华泰动态热点合并
+        cfg = load_config()
+        static_sectors = cfg.get('track_sectors', ['半导体', '元件', '电力', '化学制品', '有色金属', '汽车零部件', '军工', '光学光电', '通信设备', '电网设备', '计算机', '消费电子', '医疗器械', '光伏', '储能'])
+        # 动态热点优先，去重合并
+        all_sectors = list(dict.fromkeys(hot_sectors + static_sectors))  # 保持顺序+去重
+        hot_set = set(hot_sectors)  # 用于标记 hot_sector
+        
+        # 逐个赛道搜索申万二级行业，获取成分股，交叉匹配
+        code_to_sector = {}
+        code_hot = set()  # 属于热点赛道的代码
+        for sector_name in all_sectors[:25]:  # 限制25个避免超时
+            try:
+                # 搜索板块获取代码
+                raw = run(f'{_NODE} "{westock_script}" sector --search "{sector_name}"', timeout=8)
+                if not raw:
+                    continue
+                # 找申万二级行业代码
+                import re
+                for line in raw.split('\n'):
+                    if '申万二级' in line and sector_name in line:
+                        m = re.search(r'\|\s*(pt\d+)\s*\|', line)
+                        if m:
+                            sector_code = m.group(1)
+                            # 获取成分股
+                            raw2 = run(f'{_NODE} "{westock_script}" sector {sector_code}', timeout=12)
+                            if raw2:
+                                for sline in raw2.split('\n'):
+                                    if sline.startswith('|') and ('sh' in sline or 'sz' in sline):
+                                        sparts = [p.strip() for p in sline.split('|')]
+                                        if len(sparts) >= 2 and sparts[1]:
+                                            code_to_sector[sparts[1]] = sector_name
+                                            if sector_name in hot_set:
+                                                code_hot.add(sparts[1])
+                            break
+            except:
+                continue
+        
+        # 更新涨停池的所属行业 + 热点标记
+        matched = 0
+        for s in zt_list:
+            mc = s.get('market_code', '')
+            if mc in code_to_sector:
+                s['所属行业'] = code_to_sector[mc]
+                s['hot_sector'] = mc in code_hot
+                matched += 1
+            elif not s.get('所属行业'):
+                s['所属行业'] = '其他'
+                s['hot_sector'] = False
+        
+        print(f"  ✅ 行业匹配: {matched}/{len(zt_list)}只命中赛道（热点赛道{len(hot_sectors)}个）", file=sys.stderr)
+    except Exception as e:
+        print(f"  ⚠️ 行业匹配失败: {e}", file=sys.stderr)
+
+
 def get_zt_sub():
-    """连板股池"""
+    """连板股池 — 从涨停池数据推断连板（>=2板）"""
     yesterday = get_yesterday_date()
     date_str = yesterday.strftime('%Y%m%d')
+    
+    # ===== 数据源1: westock-data 连板概念板块 =====
+    try:
+        westock_script = str(Path(__file__).parent.parent / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        if not Path(westock_script).exists():
+            westock_script = str(Path.home() / '.qclaw' / 'skills' / 'westock-data' / 'scripts' / 'index.js')
+        # 搜索连板相关板块
+        raw = run(f'{_NODE} "{westock_script}" sector --search 连板', timeout=10)
+        if raw and '连板' in raw:
+            # 提取连板板块代码
+            import re as _re
+            m = _re.search(r'\|\s*(pt\d+)\s*\|\s*[^|]*连板', raw)
+            if m:
+                board_code = m.group(1)
+                raw2 = run(f'{_NODE} "{westock_script}" sector {board_code}', timeout=15)
+                if raw2 and '只' in raw2:
+                    sub_list = []
+                    for line in raw2.split('\n'):
+                        if line.startswith('|') and ('sh' in line or 'sz' in line):
+                            parts = [p.strip() for p in line.split('|')]
+                            if len(parts) >= 3 and parts[1]:
+                                name = parts[2]
+                                if 'ST' in name or 'st' in name.lower():
+                                    continue
+                                sub_list.append({
+                                    '代码': parts[1][2:] if len(parts[1]) > 2 else parts[1],
+                                    '名称': parts[2],
+                                    '连板数': 2,  # 最少2板
+                                    '_source': 'westock-sub'
+                                })
+                    if sub_list:
+                        print(f"  ✅ 连板池(westock): {len(sub_list)}只", file=sys.stderr)
+                        return sub_list
+    except Exception as e:
+        print(f"  ⚠️ westock连板池失败: {e}", file=sys.stderr)
+    
+    # ===== 数据源2: akshare（备用）=====
     try:
         raw = run(f"python3 -c \"import akshare as ak, warnings; warnings.filterwarnings('ignore'); df=ak.stock_zt_pool_sub_new_em(date='{date_str}'); print(df.to_json(orient='records',force_ascii=False))\"")
         if raw:
-            return json.loads(raw)
-    except:
-        pass
+            result = json.loads(raw)
+            if result:
+                print(f"  ✅ 连板池(akshare): {len(result)}只", file=sys.stderr)
+                return result
+    except Exception as e:
+        print(f"  ⚠️ akshare连板池失败: {e}", file=sys.stderr)
+    
+    # ===== 数据源3: 从涨停池中搜索新闻提取连板信息 =====
+    # 从已获取的涨停池中，通过涨幅推断连板（涨幅>10%可能是创业板2板以上）
+    print(f"  ⚠️ 所有连板池数据源失败，从涨停池推断", file=sys.stderr)
     return []
+
+
+def check_pool_staleness(pool_path=None, max_stale_days=3):
+    """检查趋势池是否过期（超过3个交易日未更新），返回True则告警"""
+    if pool_path is None:
+        pool_path = Path(__file__).parent.parent / 'trading' / '趋势容量池.md'
+    if not pool_path.exists():
+        print(f"  ⚠️ 趋势容量池文件不存在，跳过过期检查", file=sys.stderr)
+        return False
+    try:
+        # 解析"最后更新：YYYY-MM-DD"
+        text = pool_path.read_text()
+        m = re.search(r'最后更新：(\d{4})-(\d{2})-(\d{2})', text)
+        if not m:
+            print(f"  ⚠️ 趋势容量池无法解析更新日期，跳过过期检查", file=sys.stderr)
+            return False
+        last_date = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        today = datetime.date.today()
+        # 数交易日天数（排除周末）
+        count = 0
+        d = last_date + datetime.timedelta(days=1)
+        while d <= today:
+            if d.weekday() < 5:  # is_trading_day
+                count += 1
+            d += datetime.timedelta(days=1)
+        if count > max_stale_days:
+            print(f"  🔴 警告：趋势池已过期！最后更新{last_date}，距今{count}个交易日未更新（>={max_stale_days+1}个交易日）", file=sys.stderr)
+            return True
+        else:
+            print(f"  ✅ 趋势池最新（最后更新{last_date}，距今{count}个交易日）")
+            return False
+    except Exception as e:
+        print(f"  ⚠️ 趋势池过期检查失败: {e}", file=sys.stderr)
+        return False
+
 
 def get_trend_pool():
     """从趋势容量池.md解析标的"""
@@ -160,10 +501,10 @@ def get_trend_pool():
 
 def determine_emotion(ad):
     up = ad['up']
-    if up < 1500:
-        return EMOTION_RULES['below_1500']
+    if up < 1600:
+        return EMOTION_RULES['below_1600']
     elif up < 2000:
-        return EMOTION_RULES['1500_2000']
+        return EMOTION_RULES['1600_2000']
     elif up < 2500:
         return EMOTION_RULES['2000_2500']
     elif up < 3500:
@@ -179,23 +520,24 @@ def emotion_triple_check_premarket(emotion, yesterday_up):
     # 校验1：剧烈波动日
     if yesterday_up and yesterday_up > 0:
         delta = abs(today_up - yesterday_up)
-        if delta > 1500:
+        if delta > 1600:
             corrections.append(f"剧烈波动日(delta={delta})")
-            # 降级：修改emotion的dim和pos_limit
+            # 降级：修改emotion的dim和pos_limit_pct
             dim = emotion.get('dim', '1.0')
             if '2.0' in dim:
                 emotion['dim'] = '1.0'
-                emotion['pos_limit'] = min(emotion.get('pos_limit', 5), 5)
+                emotion['pos_limit_pct'] = min(emotion.get('pos_limit_pct', 50), 50)
             elif '3.0' in dim:
                 emotion['dim'] = '1.0'
-                emotion['pos_limit'] = min(emotion.get('pos_limit', 5), 5)
+                emotion['pos_limit_pct'] = min(emotion.get('pos_limit_pct', 50), 50)
     
     # 校验2：缩量修正（盘前无成交额数据，跳过）
     
-    # 校验3：极端值
-    if today_up > 4000 or today_up < 500:
+    # 校验3：极端值（仅处理真正的数据错误：>4000高位异常，正常涨跌范围0-4000内不触发）
+    # 【BUGFIX 2026-07-01】移除 today_up < 500 条件——139涨是合法冰点数据，不应触发减半
+    if today_up > 4000:
         corrections.append(f"极端值预警(涨跌{today_up})")
-        emotion['pos_limit'] = max(emotion.get('pos_limit', 5) // 2, 1)
+        emotion['pos_limit_pct'] = max(emotion.get('pos_limit_pct', 50) // 2, 10)
     
     if corrections:
         print(f"🔧 情绪三重校验: {'; '.join(corrections)}")
@@ -231,12 +573,14 @@ def select_10_first_to_second(yesterday_zt):
         amount_yi = amount / 1e8  # 转亿
         
         # 排除一字板（涨跌幅看不出来，但成交额极小的是）
-        if amount_yi < 0.1:
+        # 盘前成交额可能为0（westock-data不返回历史成交额），此时不过滤
+        if amount_yi > 0 and amount_yi < 0.1:
             continue
         
         first_boards.append({
             'name': name, 'code': code, 'sector': sector,
-            'amount': amount_yi, 'amount_raw': amount
+            'amount': amount_yi, 'amount_raw': amount,
+            'hot_sector': s.get('hot_sector', False)
         })
     
     # 统计每个板块有多少只首板（板块强度）
@@ -249,15 +593,22 @@ def select_10_first_to_second(yesterday_zt):
     for s in first_boards:
         score = 0
         score_detail = {}
-        # 额越小分越高
-        if s['amount'] <= 0.5:
-            as_ = 20
-            score += 20
-        elif s['amount'] <= 0.8:
-            as_ = 10
-            score += 10
+        # 额区间评分（适配实际首板额1-60亿）
+        # 小盘股换手充分+资金效率高 → 适中额高分
+        amt = s['amount']
+        if 1.0 <= amt <= 3.0:
+            as_ = 25       # 最佳区间：小盘换手好
+        elif 3.0 < amt <= 8.0:
+            as_ = 20       # 中盘：活跃度好
+        elif 8.0 < amt <= 20.0:
+            as_ = 15       # 中大盘
+        elif 0.5 < amt < 1.0:
+            as_ = 10       # 微盘
+        elif amt > 20.0:
+            as_ = 5        # 大盘：资金分散
         else:
-            as_ = 0
+            as_ = 0        # 极小盘
+        score += as_
         score_detail['额得分'] = as_
         # 板块有其他首板助攻
         sc = sector_count.get(s['sector'], 0)
@@ -274,9 +625,40 @@ def select_10_first_to_second(yesterday_zt):
         else:
             ss_ = 0
         score_detail['板块强度得分'] = ss_
+        # 竞价量比得分（封单强度代理）
+        zb = s.get('竞价量比', 0)
+        if zb >= 10:
+            zr_ = 20
+        elif zb >= 5:
+            zr_ = 15
+        elif zb >= 3:
+            zr_ = 10
+        elif zb >= 1.5:
+            zr_ = 5
+        else:
+            zr_ = 0
+        score += zr_
+        score_detail['竞价量比得分'] = zr_
+
+        # 封单强度得分（首板封单额 / 总额比）
+        if s.get('封单额', 0) > 0 and s['amount'] > 0:
+            seal_ratio = s.get('封单额', 0) / s['amount']
+            if seal_ratio >= 0.5:
+                sr_ = 15
+            elif seal_ratio >= 0.3:
+                sr_ = 10
+            elif seal_ratio >= 0.1:
+                sr_ = 5
+            else:
+                sr_ = 0
+        else:
+            sr_ = 0
+        score += sr_
+        score_detail['封单强度得分'] = sr_
+
         s['score'] = score
         s['score_detail'] = score_detail
-    
+
     # 催化剂评分（NEW）
     if CATALYST_AVAILABLE:
         for s in first_boards:
@@ -284,6 +666,11 @@ def select_10_first_to_second(yesterday_zt):
             s['catalyst_score'] = result['score']
             s['catalyst_grade'] = result['grade']
             s['catalyst_action'] = get_catalyst_action(result['grade'])
+            # 催化剂分数加入总分
+            cat_score_map = {'S': 15, 'A': 12, 'B': 8, 'C': 3, 'D': 0}
+            cs_add = cat_score_map.get(result['grade'], 0)
+            s['score'] = s.get('score', 0) + cs_add
+            s['score_detail']['催化剂加分'] = cs_add
         # 按催化剂评分重新排序（S>A>B>C>D）
         grade_order = {'S': 0, 'A': 1, 'B': 2, 'C': 3, 'D': 4}
         first_boards.sort(key=lambda x: (grade_order.get(x.get('catalyst_grade', 'D'), 4), -x['score'], x['amount']))
@@ -325,6 +712,7 @@ def select_10_divergence(zt_sub, yesterday_zt):
         candidates.append({
             'name': name, 'code': code, 'lb': lb,
             'sector': sector, 'amount': amount / 1e8,
+            'hot_sector': s.get('hot_sector', False),
             'score': lb * 15,
             'score_detail': {'连板得分': lb * 15, '板块强度得分': 0}
         })
@@ -366,7 +754,7 @@ def select_20_sector(yesterday_zt):
     
     for s in yesterday_zt:
         sector = s.get('所属行业', '')
-        if not sector:
+        if not sector or sector == '其他':
             continue
         sector_count[sector] = sector_count.get(sector, 0) + 1
         if sector not in sector_stocks:
@@ -428,11 +816,13 @@ def select_30_trend(trend_pool, emotion):
         _3e = load_config().get('3.0_emotion_rules', {})
         _aux = _3e.get('辅助_mode', {})
         allow_aux = _aux.get('allow_lowsuck', True)
+        melt_below = _3e.get('melt_below', 1800)  # BUG-1修复：读配置，不再硬编码2000
     except:
         allow_aux = True
+        melt_below = 1800
     
-    # C+B：冰区且禁止低吸时才跳过
-    if today_up < 2000 and not allow_aux:
+    # C+B：冰区(melt_below)且禁止低吸时才跳过
+    if today_up < melt_below and not allow_aux:
         return []
     
     # 判定locked状态
@@ -442,9 +832,9 @@ def select_30_trend(trend_pool, emotion):
     if is_aux_mode and today_up > 3500:
         locked = True
         locked_reason = '辅助模式·仅MA10低吸(≤1成)'
-    elif today_up < 2000:
+    elif today_up < melt_below:
         locked = True
-        locked_reason = '冰点·3.0熔断'
+        locked_reason = f'冰点·3.0熔断(<{melt_below})'
     else:
         # 连续2日>2500才完全激活
         state_file = Path(__file__).parent.parent / 'trading' / '系统状态.json'
@@ -547,6 +937,10 @@ def main():
     
     print(f"🦞 龙虾盘前选股引擎 v1.0 | {today}")
     
+    # 0. 趋势池过期检查（>3个交易日未更新则告警）
+    print("📋 趋势池新鲜度检查...")
+    pool_stale = check_pool_staleness()
+    
     # 1. 数据
     print("📥 获取市场数据...")
     indices = get_index()
@@ -556,15 +950,16 @@ def main():
     print(f"  指数: 上证{sh}% 深证{sz}% 创业板{cy}%")
     
     ad = get_advance_decline()
-    if not ad:
-        print("❌ 涨跌家数获取失败，退出")
-        sys.exit(1)
+    # get_advance_decline() 已改为兜底默认值，不再返回 None
     print(f"  涨跌: {ad['up']}涨/{ad['down']}跌 {ad.get('zt', '?')}涨停/{ad.get('dt', '?')}跌停")
     
     # 2. 情绪
     emotion = determine_emotion(ad)
-    emotion['up_count'] = ad['up']  # 传给select_30_trend用于激活判断
-    
+
+    # 【BUGFIX 2026-07-01】up_count 必须在三重校验之前赋值，
+    # 否则 today_up=0 导致极端值校验误判 halving(30→15)
+    emotion['up_count'] = ad['up']
+
     # 情绪三重校验（v2.5）
     state_path = Path(__file__).resolve().parent.parent / "trading" / "系统状态.json"
     yesterday_up = None
@@ -575,14 +970,31 @@ def main():
     except:
         pass
     emotion = emotion_triple_check_premarket(emotion, yesterday_up)
-    
-    print(f"📊 情绪: {ad['up']}家 → 主导{emotion['dim']} 辅助{emotion.get('aux','')} 仓位上限{emotion['pos_limit']}成")
+
+    print(f"📊 情绪: {ad['up']}家 → 主导{emotion['dim']} 辅助{emotion.get('aux','')} 仓位上限{emotion['pos_limit_pct']}%")
     
     # 3. 涨停数据
     print("📥 获取涨停数据...")
     yesterday_zt, yest_date = get_yesterday_zt()
     zt_sub = get_zt_sub()
     print(f"  昨日涨停池: {len(yesterday_zt)}只({yest_date}) 连板池: {len(zt_sub)}只")
+    
+    # 用连板池交叉更新涨停池的连板数（westock涨停池默认1板）
+    sub_codes = set()
+    for sub in zt_sub:
+        code = str(sub.get('代码', ''))
+        lb = sub.get('连板数', 2)
+        try: lb = int(lb)
+        except: lb = 2
+        sub_codes.add(code)
+        # 在涨停池中找到对应股票，更新连板数
+        for s in yesterday_zt:
+            if str(s.get('代码', '')) == code:
+                s['昨日连板数'] = lb
+                break
+    
+    # 补充涨停池的所属行业（用westock板块数据或搜索）
+    _enrich_zt_sector(yesterday_zt)
     
     # 4. 选股
     print("🔍 选股中...")
@@ -591,7 +1003,24 @@ def main():
     c2_sector = select_20_sector(yesterday_zt)
     trend_pool = get_trend_pool()
     c3_trend = select_30_trend(trend_pool, emotion)
-    
+
+    # 冰点期双收紧（v1.11：仓位+选股门槛同步收紧）
+    up = ad['up']
+    ice_tight = False
+    if up < 1600:
+        ice_tight = True
+        # below_1600：仓位30% + 1.0分歧低吸直接暂停
+        c1_div = []  # 冰点分歧低吸暂停
+        print("❄️ 冰点区(<1600)：1.0分歧低吸已暂停，仅保留一进二")
+    elif up < 2000:
+        ice_tight = True
+        # 1500-2000：仓位40% + 分歧低吸收紧
+        # 只保留连板≥3的高板股
+        c1_div_orig_len = len(c1_div)
+        c1_div = [s for s in c1_div if s.get('lb', 0) >= 3]
+        removed = c1_div_orig_len - len(c1_div)
+        print(f"❄️ 修复期(1500-2000)：分歧低吸保留≥3板({c1_div_orig_len}→{len(c1_div)}只，剔除{removed}只)")
+
     # 5. 输出JSON
     result = {
         'date': today,
@@ -604,28 +1033,36 @@ def main():
             '跌停': ad.get('dt', 0),
             '主导维度': emotion['dim'],
             '辅助维度': emotion['aux'],
-            '总仓位上限': emotion['pos_limit']
+            '总仓位上限': emotion['pos_limit_pct'],
+            '冰点收紧': ice_tight,  # v1.11: below_1600或1600-2000时True
+            '冰点说明': 'below_1600全暂停1.0分歧低吸；1600-2000仅保留≥3板' if ice_tight else ''
         },
+        'hot_sectors': fetch_hot_sectors(),
         'candidates': {
             '1.0一进二': [
                 {'名称': s['name'], '代码': s['code'], '额': s['amount'],
+                 'sector': s.get('sector', ''),
+                 'hot_sector': s.get('hot_sector', False),
                  '催化剂': s.get('catalyst_grade', '?'),
                  '建议': s.get('catalyst_action', ''),
-                 '备注': f"额{s['amount']}亿+{s['sector']}",
+                 '备注': f"额{s['amount']}亿+{s.get('sector','')}",
                  'score_detail': s.get('score_detail', {})}
                 for s in c1_first
             ],
             '1.0分歧低吸': [
                 {'名称': s['name'], '代码': s['code'], '连板': s['lb'],
+                 'sector': s.get('sector', ''),
+                 'hot_sector': s.get('hot_sector', False),
                  '催化剂': s.get('catalyst_grade', '?'),
                  '建议': s.get('catalyst_action', ''),
-                 '备注': f"{s['lb']}连板+{s['sector']}",
+                 '备注': f"{s['lb']}连板+{s.get('sector','')}{'🔥' if s.get('hot_sector') else ''}",
                  'score_detail': s.get('score_detail', {})}
                 for s in c1_div
             ],
             '2.0板块卡位': [
                 {'名称': s['name'], '代码': s['code'], '板块': s['sector'],
-                 '额': s['amount'],
+                 '额': s['amount'], 'sector_zt': s.get('sector_zt', 0),
+                 'hot_sector': s.get('hot_sector', True),  # 2.0候选默认是热点板块
                  '催化剂': s.get('catalyst_grade', '?'),
                  '建议': s.get('catalyst_action', ''),
                  '备注': f"{s['sector']}({s['sector_zt']}家涨停)",
@@ -634,7 +1071,8 @@ def main():
             ],
             '3.0趋势低吸': [
                 {'名称': s['name'], '代码': s['code'], '产业逻辑': s['logic'],
-                 '额': s['amount'],
+                 '额': s['amount'], 'sector': s.get('logic', '').split('/')[0],
+                 'hot_sector': s.get('hot_sector', False),
                  '催化剂': s.get('catalyst_grade', '?'),
                  '建议': s.get('catalyst_action', ''),
                  '备注': s['note'],
@@ -657,7 +1095,7 @@ def main():
                 c['备注'] = f"额{s['amount']}亿+{s['sector']}({sector_count.get(s['sector'],0)}家首板)"
                 break
     
-    out_path = '/tmp/lobster_premarket_candidates.json'
+    out_path = str(ROOT / 'trading' / 'premarket_candidates.json')
     with open(out_path, 'w') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     print(f"✅ 已写入 {out_path}")
@@ -667,7 +1105,7 @@ def main():
     print(f"✅ 龙虾盘前选股 {today}")
     print(f"- 情绪：{ad['up']}涨/{ad['down']}跌，{ad.get('zt',0)}涨停/{ad.get('dt',0)}跌停")
     print(f"- 主导维度：{emotion['dim']}，辅助维度：{emotion['aux']}")
-    print(f"- 总仓位上限：{emotion['pos_limit']}成")
+    print(f"- 总仓位上限：{emotion['pos_limit_pct']}%")
     
     for tier_name, stocks in result['candidates'].items():
         print(f"\n【{tier_name}】（{len(stocks)}只）")

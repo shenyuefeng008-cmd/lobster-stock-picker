@@ -1,0 +1,238 @@
+{
+  "meta": {
+    "version": "1.0",
+    "date": "2026-07-07",
+    "created_at": "2026-07-07T20:15:07.584901",
+    "source": "纯腾讯接口（无akshare依赖）"
+  },
+  "sectors": {
+    "IDC/AIDC": {
+      "framework_status": "🔴 短缺确认",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0.41,
+      "pool_dev_ma10_median": 1.23,
+      "score": 70,
+      "warnings": [],
+      "pool_stocks": [
+        "中科曙光",
+        "浪潮信息"
+      ]
+    },
+    "BBU/钠电": {
+      "framework_status": "🔴 短缺确认",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "光模块": {
+      "framework_status": "🔴 短缺确认",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "光纤": {
+      "framework_status": "🔴 短缺确认",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "化工（氟化工）": {
+      "framework_status": "🔴 短缺确认（↑）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "存储": {
+      "framework_status": "🟢未知",
+      "dynamic_heat": "🔴",
+      "avg_chg_today": -7.55,
+      "pool_dev_ma10_median": -6.26,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": [
+        "江波龙",
+        "德明利",
+        "澜起科技"
+      ]
+    },
+    "存储超级周期": {
+      "framework_status": "🔴 超级短缺（↑↑）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "有色金属/工业金属": {
+      "framework_status": "🔴 短缺确认（新）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "汽车零部件": {
+      "framework_status": "🔴 短缺确认（↑）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "液冷": {
+      "framework_status": "🔴 超级短缺",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "燃气轮机": {
+      "framework_status": "🔴 超级短缺",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "电力": {
+      "framework_status": "🔴 短缺确认（↑）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 50,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "国产芯片": {
+      "framework_status": "🟢未知",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 1.2,
+      "pool_dev_ma10_median": -2.31,
+      "score": 40,
+      "warnings": [],
+      "pool_stocks": [
+        "寒武纪",
+        "海光信息"
+      ]
+    },
+    "氟化工": {
+      "framework_status": "🟢未知",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": -1.11,
+      "pool_dev_ma10_median": -4.74,
+      "score": 40,
+      "warnings": [],
+      "pool_stocks": [
+        "多氟多"
+      ]
+    },
+    "陶瓷基板": {
+      "framework_status": "🟡 产能爬坡期",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 30,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "SOFC": {
+      "framework_status": "🟢 转折点",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 20,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "DCI": {
+      "framework_status": "🟢 早期",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "HVLP铜箔": {
+      "framework_status": "🟢 早期",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "SerDes/裕太微": {
+      "framework_status": "🟢 早期",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "国产Switch芯片": {
+      "framework_status": "🟢 加仓窗口",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "国产光刻机": {
+      "framework_status": "🟡 加速期",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "国产芯片(昇腾)": {
+      "framework_status": "🔴 产能锁定",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "工程器械": {
+      "framework_status": "🟡 底部反转",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    },
+    "电子特气": {
+      "framework_status": "🟢 早期（候选）",
+      "dynamic_heat": "🟢",
+      "avg_chg_today": 0,
+      "pool_dev_ma10_median": null,
+      "score": 0,
+      "warnings": [],
+      "pool_stocks": []
+    }
+  }
+}
