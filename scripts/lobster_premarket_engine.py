@@ -1187,5 +1187,85 @@ def main():
     
     print(f"\n📌 以上为候选池，09:25竞价阶段将从中筛选最优1只/档位")
 
+    # 7. 写入决策网关（冰点防御闭环）
+    try:
+        df_path = ROOT / 'trading' / 'decision_flags.json'
+        now_dt = datetime.datetime.now()
+        up_count = ad['up']
+        pos_limit_str = emotion['pos_limit_pct']
+
+        # 冻结判定
+        frozen = False
+        frozen_reason = ''
+        if pos_limit_str == '空仓' or '空仓' in str(pos_limit_str):
+            frozen = True
+            frozen_reason = f'极端冰点·上涨仅{up_count}家，盘前建议空仓'
+        elif pos_limit_str in ('≤1成', '1成') or (isinstance(pos_limit_str, str) and '1成' in pos_limit_str):
+            frozen = True
+            frozen_reason = f'冰点·上涨{up_count}家，仓位上限1成'
+        elif up_count < 1600:
+            frozen = True
+            frozen_reason = f'极端冰点·上涨不足{up_count}家'
+        elif up_count < 2000:
+            frozen = True
+            frozen_reason = f'冰点区·上涨{up_count}家'
+
+        # 构建 stocks 字典
+        stocks = {}
+        for tier_name, tier_stocks in result['candidates'].items():
+            for s in tier_stocks:
+                name = s.get('名称', '')
+                code = s.get('代码', '')
+                if not name:
+                    continue
+                locked = s.get('locked', False)
+                lock_reason = s.get('锁定原因', '')
+                allow_buy = not locked and not frozen
+                if locked:
+                    allow_buy = False
+                stocks[name] = {
+                    'code': code,
+                    'status': 'locked' if locked else 'observe',
+                    'reason': lock_reason if locked else '',
+                    'allow_buy': allow_buy,
+                }
+
+        # 加载风控配置
+        risk_defaults = {
+            'hard_stop_pct': -7.0,
+            'stop_warning_pct': -5.0,
+            'trailing_stop_pct': -3.0,
+            'trailing_profit_threshold_pct': 5.0,
+            'new_order_frozen_on_ice_point': True,
+            'max_position_count_on_ice_point': 0,
+        }
+        risk = {}
+        try:
+            with open(ROOT / 'lobster-config.json') as rc_f:
+                risk = json.load(rc_f).get('risk_control', risk_defaults)
+        except:
+            risk = risk_defaults
+
+        flags = {
+            'timestamp': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            'position_limit': str(pos_limit_str),
+            'new_order_frozen': frozen,
+            'frozen_reason': frozen_reason,
+            'stocks': stocks,
+            'stop_loss_rules': {
+                'hard_stop_pct': risk.get('hard_stop_pct', -7.0),
+                'warning_pct': risk.get('stop_warning_pct', -5.0),
+                'trailing_stop_pct': risk.get('trailing_stop_pct', -3.0),
+                'trailing_profit_threshold_pct': risk.get('trailing_profit_threshold_pct', 5.0),
+                'trailing_stop_enabled': True,
+            },
+        }
+
+        with open(df_path, 'w', encoding='utf-8') as df_f:
+            json.dump(flags, df_f, ensure_ascii=False, indent=2)
+        print(f"🛡️  决策网关已生成: trading/decision_flags.json ({'冻结' if frozen else '允许'}新开仓)")
+    except Exception as e:
+        print(f"⚠️ 决策网关写入失败: {e}")
+
 if __name__ == '__main__':
     main()

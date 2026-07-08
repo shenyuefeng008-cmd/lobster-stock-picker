@@ -350,19 +350,51 @@ def calc_ma(klines, period):
     if len(klines) < period: return None
     return sum(k['close'] for k in klines[-period:]) / period
 
+# ==================== 风控配置加载 ====================
+def _load_risk_control():
+    """从 lobster-config.json 读取 risk_control 节，兜底使用默认值"""
+    defaults = {
+        'hard_stop_pct': -7.0,
+        'stop_warning_pct': -5.0,
+        'trailing_stop_pct': -3.0,
+        'trailing_profit_threshold_pct': 5.0,
+        'new_order_frozen_on_ice_point': True,
+        'max_position_count_on_ice_point': 0,
+    }
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        return cfg.get('risk_control', defaults)
+    except:
+        return defaults
+
+
 # ==================== 卖点检测 ====================
 def detect_sellpoints(positions, quotes):
-    """检测所有持仓卖点，返回 [(code, name, reason, action)]"""
+    """检测所有持仓卖点，返回 (triggers, stop_statuses)：
+    triggers: [(code, name, reason, action)]
+    stop_statuses: {code: {status, pnl_pct, price, buy_price}}"""
     triggers = []
+    stop_statuses = {}
+    risk = _load_risk_control()
+    hard_stop = risk['hard_stop_pct']          # -7.0
+    stop_warn = risk['stop_warning_pct']        # -5.0
+    trail_stop = risk['trailing_stop_pct']      # -3.0
+    trail_thresh = risk['trailing_profit_threshold_pct']  # 5.0
+
     sellable = [p for p in positions if p.get('can_sell')]
     if not sellable:
-        return triggers
+        return triggers, stop_statuses
 
     for pos in sellable:
         code = pos['code']
         name = pos['name']
         q = quotes.get(code)
         if not q or q['price'] == 0:
+            stop_statuses[code] = {
+                'name': name, 'status': '数据缺失', 'pnl_pct': 0,
+                'price': 0, 'buy_price': float(pos['buy_price'])
+            }
             continue
         buy_price = float(pos['buy_price'])
         pnl_pct = (q['price'] - buy_price) / buy_price * 100
@@ -370,11 +402,37 @@ def detect_sellpoints(positions, quotes):
         hold_days = (datetime.date.today() - datetime.datetime.strptime(pos['buy_date'], '%Y-%m-%d').date()).days
 
         reason = None
+        stop_status = '正常'
 
-        # 1.0/2.0 硬止损
-        sl = STOP_LOSS.get(dim, -5.0)
-        if pnl_pct <= sl:
-            reason = f"{dim}硬止损：回撤{pnl_pct:.2f}% ≤ {sl:.0f}%"
+        # ── 阶梯止损判定（优先级从高到低）──
+
+        # 🔴 -7% 硬止损（最高优先级）
+        if pnl_pct <= hard_stop:
+            reason = f"🔴 强制止损：亏损{pnl_pct:.1f}% ≤ {hard_stop}%（成本{buy_price:.2f}→现价{q['price']:.2f}）"
+            stop_status = '强制止损'
+
+        # ⚠️ -5% 预警（不自动卖出，但标记提醒）
+        elif pnl_pct <= stop_warn and not reason:
+            stop_status = '止损预警'
+
+        # 📉 移动止盈：盈利 > trail_thresh%，从日内最高点回撤 > |trail_stop|%
+        if not reason and pnl_pct > 0:
+            day_high = q.get('high', q['price'])
+            if day_high > 0 and day_high > buy_price:
+                peak_pct = (day_high - buy_price) / buy_price * 100  # 日内最高盈利%
+                if peak_pct >= trail_thresh:
+                    drawdown = peak_pct - pnl_pct  # 从高点回撤的百分点
+                    if drawdown >= abs(trail_stop):
+                        reason = f"📉 移动止盈触发：最高盈利{peak_pct:.1f}%，回撤{drawdown:.1f}%≥{abs(trail_stop)}%"
+                        stop_status = '移动止盈触发'
+
+        # ── 原有止损逻辑（在阶梯止损未触发时继续生效）──
+
+        # 1.0/2.0 硬止损（兼容旧 STOP_LOSS 配置）
+        if not reason:
+            sl = STOP_LOSS.get(dim, -5.0)
+            if pnl_pct <= sl:
+                reason = f"{dim}硬止损：回撤{pnl_pct:.2f}% ≤ {sl:.0f}%"
 
         # 1.0 时间止损
         if not reason and '1.0' in dim and hold_days >= 3 and pnl_pct < 9.8:
@@ -394,15 +452,11 @@ def detect_sellpoints(positions, quotes):
 
         # 超短卖点（14:50后，涨停次日未封板）
         now_min = datetime.datetime.now().hour * 60 + datetime.datetime.now().minute
-        if not reason and now_min >= 890 and '1.0' in dim:  # 14:50=890
-            # 必须确认昨日确实涨停（涨幅≥9.5%），否则不触发
-            # 检查持仓买入后昨日涨幅：用buy_price对比昨日收盘价
-            # 简化：当前涨幅<7%且昨日涨停→未封板卖出；非涨停股不触发此规则
+        if not reason and now_min >= 890 and '1.0' in dim:
             buy_date_str = pos.get('buy_date', '')
             was_limit_up_yesterday = False
             if buy_date_str:
                 try:
-                    # 查询昨日K线确认是否涨停（via westock-data）
                     klines = fetch_kline(code, 5)
                     if len(klines) >= 2:
                         yesterday_close = klines[-2]['close']
@@ -411,19 +465,18 @@ def detect_sellpoints(positions, quotes):
                             yesterday_pct = (yesterday_close - day_before_close) / day_before_close * 100
                             was_limit_up_yesterday = yesterday_pct >= 9.5
                 except:
-                    pass  # 数据获取失败则保守不触发
+                    pass
             if was_limit_up_yesterday and q['pct'] < 7:
                 reason = f"超短卖点：涨停次日未封板(昨涨≥9.5%,现{q['pct']:.1f}%)"
 
-        # 分时止盈（盈利>min_profit_pct才启用，回调>callback_threshold_pct触发）
+        # 分时止盈（兼容旧配置）
         if not reason and pnl_pct > 0:
             tp_cfg = _load_take_profit_config()
             if pnl_pct >= tp_cfg.get('min_profit_pct', 5.0) and hold_days >= 1:
-                # 盈利达标，检查日内高点回落比例
                 day_high = q.get('high', q['price'])
                 if day_high > 0 and day_high > buy_price:
-                    peak_pct = (day_high - buy_price) / buy_price * 100  # 最高点盈利%
-                    callback_pct = peak_pct - pnl_pct  # 从高点回落的百分点
+                    peak_pct = (day_high - buy_price) / buy_price * 100
+                    callback_pct = peak_pct - pnl_pct
                     if callback_pct >= tp_cfg.get('callback_threshold_pct', 5.0):
                         reason = f"分时止盈：最高盈利{peak_pct:.1f}%回落{callback_pct:.1f}%≥{tp_cfg['callback_threshold_pct']}%"
 
@@ -432,7 +485,6 @@ def detect_sellpoints(positions, quotes):
             reason = f"时间止损：持仓{hold_days}天 ≥ {MAX_HOLD_DAYS}天"
 
         if reason:
-            # sell_type: 亏损→止损, 盈利→止盈, 规则名含止损→止损
             if '止损' in reason:
                 sell_type_val = "止损"
             elif pnl_pct < 0:
@@ -442,10 +494,19 @@ def detect_sellpoints(positions, quotes):
             sell(code, q['price'], reason, sell_type_val)
             triggers.append((code, name, reason, 'SELL'))
 
-    return triggers
+        # 记录止损状态（所有持仓）
+        stop_statuses[code] = {
+            'name': name,
+            'status': stop_status,
+            'pnl_pct': round(pnl_pct, 2),
+            'price': q['price'],
+            'buy_price': buy_price,
+        }
+
+    return triggers, stop_statuses
 
 # ==================== 买点检测 ====================
-def detect_buypoints(candidates, quotes, emotion, minute_signals=None):
+def detect_buypoints(candidates, quotes, emotion, minute_signals=None, decision_flags=None):
     """检测买点，返回 [(code, name, reason, action)]"""
     triggers = []
     positions = []  # 初始化持仓列表
@@ -529,6 +590,13 @@ def detect_buypoints(candidates, quotes, emotion, minute_signals=None):
 
             # 停牌检测（华泰API提供，westock无此字段）
             if q.get('is_suspended'):
+                continue
+
+            # 决策网关 stock 级封锁：allow_buy=false 则跳过
+            dl_stocks = decision_flags.get('stocks', {})
+            if name in dl_stocks and not dl_stocks[name].get('allow_buy', True):
+                dl_reason = dl_stocks[name].get('reason', '决策网关锁定')
+                print(f"  🛡️  {name}({code}): 决策网关锁定 — {dl_reason}")
                 continue
 
             # 涨停封死→跳过（优先用limitUp判断，更可靠；兜底用pct）
@@ -719,6 +787,23 @@ def run():
     positions = pos_data.get('positions', [])
     candidates = cand_data.get('candidates', {})
 
+    # 2.1 决策网关：读取当日决策开关（冰点防御闭环）
+    decision_flags = {}
+    try:
+        df_path = BASE.parent / 'trading' / 'decision_flags.json'
+        if df_path.exists():
+            with open(df_path) as df:
+                decision_flags = json.load(df)
+            frozen = decision_flags.get('new_order_frozen', False)
+            if frozen:
+                frozen_reason = decision_flags.get('frozen_reason', '')
+                print(f"🛡️  决策网关: ❌ 新开仓冻结 — {frozen_reason}")
+            else:
+                pos_limit_str = decision_flags.get('position_limit', '正常')
+                print(f"🛡️  决策网关: ✅ 新开仓允许 — 仓位上限{pos_limit_str}")
+    except Exception as e:
+        print(f"⚠️ 决策网关读取失败: {e}")
+
     # 合并所有需要行情的代码
     all_codes = set()
     for p in positions:
@@ -763,8 +848,15 @@ def run():
             print(f"  {name}({code}): {warn}")
 
     # 3. 先卖后买
-    sell_triggers = detect_sellpoints(positions, quotes)
-    buy_triggers = detect_buypoints(candidates, quotes, emotion, minute_signals)
+    sell_triggers, stop_statuses = detect_sellpoints(positions, quotes)
+
+    # 决策网关冻结时，直接跳过买入信号
+    frozen = decision_flags.get('new_order_frozen', False)
+    buy_triggers = []
+    if not frozen:
+        buy_triggers = detect_buypoints(candidates, quotes, emotion, minute_signals, decision_flags)
+    else:
+        print(f"⏸️  决策网关冻结新开仓，跳过买入信号扫描")
 
     # 4. 输出结果
     if sell_triggers:
@@ -790,8 +882,45 @@ def run():
             for line in late_out:
                 print(f"  {line}")
 
-    # 6. 持仓状态
+    # 6. 持仓状态（含止损状态）
     if positions:
+        print(f"\n{'='*70}")
+        print(f"📊 持仓监控 | 止损状态")
+        print(f"{'─'*70}")
+        print(f"{'名称':<10} {'代码':<8} {'现价':<8} {'成本':<8} {'盈亏%':<8} {'止损状态':<16} {'建议操作'}")
+        print(f"{'─'*70}")
+        for pos in positions:
+            code = pos['code']
+            name = pos.get('name', '')
+            buy_price = float(pos['buy_price'])
+            q = quotes.get(code)
+            if q and q['price'] > 0:
+                pnl = (q['price'] - buy_price) / buy_price * 100
+                ss = stop_statuses.get(code, {})
+                status = ss.get('status', '正常')
+                # 状态图标
+                icon_map = {
+                    '正常': '✅',
+                    '止损预警': '⚠️',
+                    '强制止损': '🔴',
+                    '移动止盈触发': '📉',
+                    '数据缺失': '❓',
+                }
+                icon = icon_map.get(status, '  ')
+                # 建议操作
+                if status == '强制止损':
+                    advice = f'卖出{q.get("price",0):.2f}'
+                elif status == '止损预警':
+                    advice = '密切关注'
+                elif status == '移动止盈触发':
+                    advice = '减仓/清仓'
+                else:
+                    advice = '持有'
+                print(f"{name:<10} {code:<8} {q['price']:<8.2f} {buy_price:<8.2f} {pnl:<+8.1f}% {icon}{status:<14} {advice}")
+            else:
+                print(f"{name:<10} {code:<8} {'--':<8} {buy_price:<8.2f} {'--':<8} {'❓ 数据缺失':<16} {'--'}")
+        print(f"{'='*70}")
+    else:
         print(f"\n{trade_status()}")
 
     # 7. 保存买点通知

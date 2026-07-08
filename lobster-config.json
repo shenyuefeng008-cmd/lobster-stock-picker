@@ -899,5 +899,14 @@
       "hold_days": 3
     },
     "_note": "v1.22(07-08): 回测系统配置。default_days默认回测60天；竞价高开≥3%、量比≥1.05、5min内急拉≥3%；分钟量异动≥2x均量、价破前5K高、T+3持有"
+  },
+  "risk_control": {
+    "hard_stop_pct": -7.0,
+    "stop_warning_pct": -5.0,
+    "trailing_stop_pct": -3.0,
+    "trailing_profit_threshold_pct": 5.0,
+    "new_order_frozen_on_ice_point": true,
+    "max_position_count_on_ice_point": 0,
+    "_note": "v1.23(07-08): 风控配置。硬止损-7%、预警-5%、移动止盈盈利>5%后回撤>3%触发、冰点冻结新开仓"
   }
 }
