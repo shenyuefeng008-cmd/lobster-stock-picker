@@ -973,6 +973,44 @@ def main():
 
     print(f"📊 情绪: {ad['up']}家 → 主导{emotion['dim']} 辅助{emotion.get('aux','')} 仓位上限{emotion['pos_limit_pct']}%")
     
+    # 2.5 竞价异动（thsdk集成）→ 在步骤3之前运行，用于交叉匹配候选池
+    auction_anomalies = []
+    auction_codes = set()
+    auction_weight = 0
+    try:
+        config = load_config()
+        thsdk_cfg = config.get('thsdk', {})
+        if thsdk_cfg.get('enabled', True):
+            print("📡 竞价异动监控(thsdk)...")
+            auction_script = SCRIPT_DIR / 'lobster_auction_monitor.py'
+            if auction_script.exists():
+                r = subprocess.run(
+                    [sys.executable, str(auction_script)],
+                    capture_output=True, text=True, timeout=30,
+                    cwd=str(ROOT)
+                )
+                auction_path = ROOT / 'trading' / 'auction_anomaly.json'
+                if auction_path.exists():
+                    with open(auction_path) as af:
+                        auction_data = json.load(af)
+                    auction_anomalies = auction_data.get('anomalies', [])
+                    for a in auction_anomalies:
+                        code = str(a.get('code', a.get('代码', '')))
+                        if code:
+                            auction_codes.add(code)
+                    auction_weight = thsdk_cfg.get('auction_anomaly_weight', 10)
+                    print(f"  ✅ 竞价异动: {len(auction_anomalies)}条, {len(auction_codes)}只标的")
+                    if auction_anomalies:
+                        # 打印前5条异动摘要
+                        for a in auction_anomalies[:5]:
+                            print(f"    {a.get('code','')} {a.get('name','')} {a.get('type','')}")
+                else:
+                    print("  ⚠️  竞价异动脚本未产出结果文件")
+            else:
+                print("  ⚠️  lobster_auction_monitor.py 不存在，跳过")
+    except Exception as e:
+        print(f"  ⚠️  竞价异动采集失败: {e}")
+    
     # 3. 涨停数据
     print("📥 获取涨停数据...")
     yesterday_zt, yest_date = get_yesterday_zt()
@@ -1020,6 +1058,32 @@ def main():
         c1_div = [s for s in c1_div if s.get('lb', 0) >= 3]
         removed = c1_div_orig_len - len(c1_div)
         print(f"❄️ 修复期(1500-2000)：分歧低吸保留≥3板({c1_div_orig_len}→{len(c1_div)}只，剔除{removed}只)")
+
+    # 4.5 竞价异动交叉匹配（提升候选池中同时在竞价异动里的股票优先级）
+    if auction_codes and auction_weight > 0:
+        auction_confirmed = []
+        all_candidates = [c1_first, c1_div, c2_sector, c3_trend]
+        dim_names = ['1.0一进二', '1.0分歧低吸', '2.0板块卡位', '3.0趋势低吸']
+        for dim_idx, candidates in enumerate(all_candidates):
+            for c in candidates:
+                code = str(c.get('code', ''))
+                if code in auction_codes:
+                    c['score'] = c.get('score', 0) + auction_weight
+                    c['auction_confirmed'] = True
+                    c['auction_type'] = next(
+                        (a.get('type', a.get('异动类型', '')) for a in auction_anomalies
+                         if str(a.get('code', a.get('代码', ''))) == code),
+                        ''
+                    )
+                    if code not in auction_confirmed:
+                        auction_confirmed.append(code)
+        if auction_confirmed:
+            print(f"🔔 竞价异动交叉确认: {len(auction_confirmed)}只 [{', '.join(auction_confirmed)}] +{auction_weight}分")
+            # 重新排序各维度（有竞价确认的排在前面）
+            c1_first.sort(key=lambda x: (x.get('auction_confirmed', False), x.get('score', 0)), reverse=True)
+            c1_div.sort(key=lambda x: (x.get('auction_confirmed', False), x.get('score', 0)), reverse=True)
+            c2_sector.sort(key=lambda x: (x.get('auction_confirmed', False), x.get('score', 0)), reverse=True)
+            c3_trend.sort(key=lambda x: (x.get('auction_confirmed', False), x.get('score', 0)), reverse=True)
 
     # 5. 输出JSON
     result = {

@@ -445,7 +445,7 @@ def detect_sellpoints(positions, quotes):
     return triggers
 
 # ==================== 买点检测 ====================
-def detect_buypoints(candidates, quotes, emotion):
+def detect_buypoints(candidates, quotes, emotion, minute_signals=None):
     """检测买点，返回 [(code, name, reason, action)]"""
     triggers = []
     positions = []  # 初始化持仓列表
@@ -569,6 +569,16 @@ def detect_buypoints(candidates, quotes, emotion):
                     adj_pct = adj_pct / 2
                 if adj_pct <= 0:
                     continue
+                # 分钟K线确认（thsdk集成）：买入信号需突破5分钟前高才触发
+                if minute_signals and code in minute_signals:
+                    ms = minute_signals[code]
+                    has_price_break = any(
+                        sig['type'] == 'price_break' for sig in ms.get('signals', [])
+                    )
+                    if not has_price_break:
+                        # 无分钟K线价格突破确认，跳过买入（保留监控）
+                        print(f"  ⏸️  {name}({code}): 买点触发但分钟K线未突破前高，跳过")
+                        continue
                 sector = item.get('sector', item.get('板块', item.get('track', item.get('产业逻辑', ''))))
                 buy(code, name, q['price'], reason, dim, up_count=up_count, position_pct=adj_pct, sector=sector)
                 item['status'] = '已买入'
@@ -722,9 +732,39 @@ def run():
     quotes = fetch_quotes(list(all_codes))
     print(f"📊 行情获取: {len(quotes)}只")
 
+    # 2.5 分钟K线信号检查（thsdk集成）
+    minute_signals = {}
+    try:
+        minute_path = BASE.parent / 'trading' / 'minute_signals.json'
+        if minute_path.exists():
+            with open(minute_path) as mf:
+                minute_data = json.load(mf)
+            minute_signals = minute_data.get('details', {})
+            codes_with_signals = minute_data.get('codes_with_signals', [])
+            if codes_with_signals:
+                print(f"📡 分钟K线信号: {len(codes_with_signals)}只有异动")
+    except Exception as e:
+        print(f"⚠️ 分钟K线信号读取失败: {e}")
+
+    # 分钟K线预警（持仓股出现量价异动）
+    minute_warnings = []
+    for pos in positions:
+        code = pos.get('code', '')
+        if code in minute_signals:
+            ms = minute_signals[code]
+            for sig in ms.get('signals', []):
+                if sig['type'] == 'volume_spike':
+                    minute_warnings.append((code, pos.get('name', ''), f"⚠️ 分钟量异动: {sig['description']}"))
+                elif sig['type'] == 'price_break':
+                    minute_warnings.append((code, pos.get('name', ''), f"📈 分钟价格突破: {sig['description']}"))
+    if minute_warnings:
+        print(f"\n🔔 分钟K线预警（{len(minute_warnings)}条）:")
+        for code, name, warn in minute_warnings:
+            print(f"  {name}({code}): {warn}")
+
     # 3. 先卖后买
     sell_triggers = detect_sellpoints(positions, quotes)
-    buy_triggers = detect_buypoints(candidates, quotes, emotion)
+    buy_triggers = detect_buypoints(candidates, quotes, emotion, minute_signals)
 
     # 4. 输出结果
     if sell_triggers:
