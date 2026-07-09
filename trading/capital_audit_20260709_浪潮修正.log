@@ -1,0 +1,8 @@
+=== 资金修正日志 ===
+时间: 2026-07-09 13:32:27
+原因: 华泰API在09:30返回昨收价78.17（非实时价），系统误将其视为实时报价触发买入
+操作: 移除浪潮信息(000977)持仓及交易记录，恢复资金
+退款金额: 101946.5 (含手续费 26.5)
+持仓信息: {'code': '000977', 'name': '浪潮信息', 'buy_date': '2026-07-09', 'buy_time': '2026-07-09 09:30:12', 'buy_price': 78.4, 'shares': 1300, 'cost': 101920.0, 'dimension': '2.0板块卡位', 'reason': '板块卡位，前排领涨', 'position_pct': 9.9, 'stock_factor': 0.66, 'can_sell': False, 'sector': None, 'catalyst_grade': None, 'limit_price': None, 'current_price': 78.4, 'market_value': 101920.0, 'total_pnl': 0.0, 'total_pnl_pct': 0.0}
+交易记录: {'date': '2026-07-09', 'time': '2026-07-09 09:30:12', 'type': 'BUY', 'code': '000977', 'name': '浪潮信息', 'price': 78.4, 'shares': 1300, 'amount': 101946.5, 'dimension': '2.0板块卡位', 'reason': '板块卡位，前排领涨', 'limit_price': None, 'fees': {'buy': 26.5, 'total': 26.5}}
+可用资金: 567488.98 → 669435.48

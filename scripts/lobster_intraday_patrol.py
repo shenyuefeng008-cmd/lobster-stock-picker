@@ -215,8 +215,26 @@ def _code_to_exchange(code):
         return 'BJ'
     return None
 
+def _load_price_guard():
+    """从 lobster-config.json 读取 price_guard 配置，兜底使用默认值"""
+    defaults = {
+        'max_deviation_from_close': 0.10,
+        'min_multiplier_of_open': 0.95,
+        'reject_on_stale_price': True,
+    }
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = json.load(f)
+        return cfg.get('price_guard', defaults)
+    except:
+        return defaults
+
+PRICE_GUARD = _load_price_guard()
+
 def fetch_quotes_ht(codes):
-    """华泰行情API（主数据源）：并发获取 price/pct/limit_up/is_suspended，更可靠"""
+    """华泰行情API（主数据源）：并发获取 price/pct/limit_up/is_suspended，更可靠
+    v1.2: 新增幻影价校验 — 用昨收价（limitUp/1.10）交叉验证，过滤 stale 数据和极端异常值
+    """
     if not codes:
         return {}
     quotes = {}
@@ -239,11 +257,31 @@ def fetch_quotes_ht(codes):
             data = resp.json()
             if data.get('ok') and data.get('data'):
                 d = data['data']
+                price = float(d.get('currentPrice', 0))
+                pct = float(d.get('change', 0))
+                limit_up = float(d.get('limitUp', 0))
+                limit_down = float(d.get('limitDown', 0))
+
+                # ── 幻影价防护 v1.2 ──
+                if limit_up > 0 and PRICE_GUARD.get('reject_on_stale_price', True):
+                    est_close = round(limit_up / 1.10, 2)
+                    max_dev = PRICE_GUARD.get('max_deviation_from_close', 0.10)
+
+                    # 检查1: 价格是否等于昨收价（stale数据，特别是高开股开盘瞬间）
+                    is_stale = (abs(price - est_close) < 0.01 and abs(pct) < 0.01)
+                    # 检查2: 价格是否超出昨收 ± max_dev 范围（极端异常值）
+                    out_of_range = (price < est_close * (1 - max_dev) or price > est_close * (1 + max_dev))
+
+                    if is_stale or out_of_range:
+                        print(f"⚠️ 华泰价格校验失败({code}): price={price}, est_昨收={est_close}, "
+                              f"pct={pct}%, stale={is_stale}, outlier={out_of_range} → 降级到westock", file=sys.stderr)
+                        return code, None
+
                 return code, {
-                    'price': float(d.get('currentPrice', 0)),
-                    'pct': float(d.get('change', 0)),
-                    'limit_up': float(d.get('limitUp', 0)),
-                    'limit_down': float(d.get('limitDown', 0)),
+                    'price': price,
+                    'pct': pct,
+                    'limit_up': limit_up,
+                    'limit_down': limit_down,
                     'is_suspended': d.get('isSuspended', False),
                 }
         except Exception as e:
@@ -320,6 +358,25 @@ def fetch_quotes(codes):
     elif ht_ok > 0:
         print(f"📊 行情: 华泰{ht_ok}只 + westock{ws_ok}只")
     return quotes
+
+def _fetch_open_price_qt(code):
+    """从腾讯行情 API 获取股票今日开盘价（parts[5]=今开）
+    用于交叉验证华泰API返回的价格是否合理（高开股开盘瞬间可能返回昨收价）
+    """
+    try:
+        prefix = 'sh' if code.startswith('6') else 'sz'
+        url = f'https://qt.gtimg.cn/q={prefix}{code}'
+        from urllib.request import urlopen
+        raw = urlopen(url, timeout=3).read()
+        txt = raw.decode('gbk', errors='replace')
+        for line in txt.strip().split('\n'):
+            if 'v_' in line:
+                parts = line.split('"')[1].split('~')
+                if len(parts) > 5 and parts[3]:
+                    return float(parts[3])
+    except Exception as e:
+        print(f"⚠️ 腾讯开盘价获取失败({code}): {e}", file=sys.stderr)
+    return None
 
 def fetch_kline(code, days=10):
     """获取K线数据（via westock-data）"""
@@ -648,6 +705,13 @@ def detect_buypoints(candidates, quotes, emotion, minute_signals=None, decision_
                         print(f"  ⏸️  {name}({code}): 买点触发但分钟K线未突破前高，跳过")
                         continue
                 sector = item.get('sector', item.get('板块', item.get('track', item.get('产业逻辑', ''))))
+                # ── 开盘价交叉验证 v1.2: 防幻影价 ──
+                open_price = _fetch_open_price_qt(code)
+                min_mult = PRICE_GUARD.get('min_multiplier_of_open', 0.95)
+                if open_price and open_price > 0 and q['price'] < open_price * min_mult:
+                    print(f"⚠️ {name}({code}): 华泰报价{q['price']}低于腾讯开盘价{open_price}的{min_mult*100:.0f}%，疑似幻影价，拒绝买入",
+                          file=sys.stderr)
+                    continue
                 buy(code, name, q['price'], reason, dim, up_count=up_count, position_pct=adj_pct, sector=sector)
                 item['status'] = '已买入'
                 positions.append(code)  # 记录持仓
