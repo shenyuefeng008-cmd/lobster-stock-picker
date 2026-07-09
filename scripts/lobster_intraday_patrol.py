@@ -748,6 +748,204 @@ def late_session_check(emotion, quotes, positions):
 
     return outputs
 
+
+def _load_decision_flags_with_fallback():
+    """
+    加载决策开关，带冰点防御兜底。
+    优先读取 decision_flags.json（网关产出）；
+    若不存在（时序竞态：巡检早于网关），自行解析最新盘前报告构建决策开关。
+    """
+    df_path = BASE.parent / 'trading' / 'decision_flags.json'
+
+    # 优先：读取网关产出
+    if df_path.exists():
+        try:
+            with open(df_path) as df:
+                flags = json.load(df)
+            frozen = flags.get('new_order_frozen', False)
+            if frozen:
+                print(f"🛡️  决策网关: ❌ 新开仓冻结 — {flags.get('frozen_reason', '')}")
+            else:
+                print(f"🛡️  决策网关: ✅ 新开仓允许 — 仓位上限{flags.get('position_limit', '正常')}")
+            return flags
+        except Exception as e:
+            print(f"⚠️ 决策网关读取失败({e})，降级至报告解析")
+
+    # 兜底：自行解析最新盘前报告
+    print("⚠️ decision_flags.json 不存在，巡检启动早于决策网关 → 自行解析盘前报告兜底")
+    report_path = _find_latest_premarket_report()
+    if not report_path:
+        print("❌ 无法找到盘前报告，不冻结（最大限度确保不遗漏）")
+        return {}
+
+    print(f"📄 兜底报告: {report_path}")
+    report_info = _parse_premarket_for_patrol(report_path)
+    if not report_info:
+        return {}
+
+    # 加载风控配置
+    try:
+        rc_path = BASE.parent / 'config' / 'risk_control.json'
+        if rc_path.exists():
+            with open(rc_path) as f:
+                risk_config = json.load(f)
+        else:
+            risk_config = {'new_order_frozen_on_ice_point': True}
+    except Exception:
+        risk_config = {'new_order_frozen_on_ice_point': True}
+
+    flags = _build_decision_flags_from_report(report_info, risk_config)
+    frozen = flags.get('new_order_frozen', False)
+    if frozen:
+        print(f"🛡️  兜底决策: ❌ 新开仓冻结 — {flags.get('frozen_reason', '')}")
+    else:
+        print(f"🛡️  兜底决策: ✅ 新开仓允许 — 仓位上限{flags.get('position_limit', '正常')}")
+    return flags
+
+
+def _find_latest_premarket_report():
+    """定位最新的盘前选股报告（与决策网关同逻辑）"""
+    report_dir = BASE.parent / 'reports'
+    if not report_dir.exists():
+        return None
+    candidates = list(report_dir.glob('盘前选股_*.md'))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
+def _parse_premarket_for_patrol(report_path):
+    """解析盘前报告，提取上涨家数、仓位建议、标的锁定状态"""
+    text = Path(report_path).read_text(encoding='utf-8')
+    result = {
+        'up_count': 0,
+        'position_advice': '正常',
+        'is_ice_point': False,
+        'ice_reason': '',
+        'stocks': {},
+    }
+
+    # 提取上涨家数
+    m = re.search(r'(\d+)\s*涨.*?(\d+)\s*跌', text)
+    if m:
+        result['up_count'] = int(m.group(1))
+
+    up = result['up_count']
+
+    # 仓位建议
+    if '空仓' in text:
+        result['position_advice'] = '空仓'
+        result['is_ice_point'] = True
+        result['ice_reason'] = f'极端冰点·上涨仅{up}家，盘前建议空仓'
+    elif '≤1成' in text or '≤1成' in text or '1成' in text:
+        result['position_advice'] = '≤1成'
+        result['is_ice_point'] = True
+        result['ice_reason'] = f'冰点·上涨仅{up}家，仓位上限1成'
+    elif up < 1600:
+        result['position_advice'] = '≤1成'
+        result['is_ice_point'] = True
+        result['ice_reason'] = f'极端冰点·上涨不足{up}家'
+    elif up < 2000:
+        result['is_ice_point'] = True
+        result['ice_reason'] = f'冰点区·上涨{up}家，≤1成分歧低吸暂停'
+    elif up < 2500:
+        result['emotion_label'] = '温和'
+    elif up < 3500:
+        result['emotion_label'] = '活跃'
+    else:
+        result['emotion_label'] = '高潮'
+
+    # 解析3.0趋势低吸节标的锁定状态
+    in_30_section = False
+    for line in text.split('\n'):
+        if '3.0趋势低吸' in line:
+            in_30_section = True
+            continue
+        if '1.0分歧低吸' in line or '1.0一进二' in line or '2.0板块卡位' in line:
+            in_30_section = False
+            continue
+        if not in_30_section:
+            continue
+
+        stock_match = re.match(r'.*?(\w[\u4e00-\u9fa5]+?)\((\d{6})\)', line)
+        if stock_match:
+            name = stock_match.group(1)
+            code = stock_match.group(2)
+            allow_buy = True
+            reason = ''
+
+            if '熔断' in line or 'locked' in line.lower():
+                allow_buy = False
+                reason = f'冰点·3.0熔断'
+            elif '锁定' in line:
+                allow_buy = False
+                reason = '锁定'
+            elif '辅助' in line and '1成' in line:
+                allow_buy = False
+                reason = '辅助模式·仅MA10低吸'
+
+            result['stocks'][name] = {
+                'code': code,
+                'status': 'locked' if not allow_buy else 'observe',
+                'reason': reason,
+                'allow_buy': allow_buy,
+            }
+
+    return result
+
+
+def _build_decision_flags_from_report(report_info, risk_config):
+    """从报告解析结果构建 decision_flags 结构"""
+    now = datetime.datetime.now()
+    up = report_info.get('up_count', 0)
+    position_advice = report_info.get('position_advice', '正常')
+
+    # 冻结判定（与决策网关同逻辑）
+    frozen = False
+    frozen_reason = ''
+    if position_advice == '空仓':
+        frozen = True
+        frozen_reason = f'极端冰点·上涨仅{up}家，盘前建议空仓'
+    elif position_advice == '≤1成':
+        frozen = True
+        frozen_reason = f'冰点·上涨{up}家，仓位上限1成'
+    elif up < 1600:
+        frozen = True
+        frozen_reason = f'极端冰点·上涨不足{up}家'
+    elif up < 2000:
+        frozen = True
+        frozen_reason = f'冰点区·上涨{up}家'
+
+    new_order_frozen = frozen if risk_config.get('new_order_frozen_on_ice_point', True) else False
+
+    # 构建 stocks
+    stocks = {}
+    for name, info in report_info.get('stocks', {}).items():
+        stocks[name] = {
+            'code': info.get('code', ''),
+            'status': info.get('status', 'observe'),
+            'reason': info.get('reason', ''),
+            'allow_buy': info.get('allow_buy', True) and not new_order_frozen,
+        }
+
+    return {
+        'timestamp': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'position_limit': position_advice,
+        'new_order_frozen': new_order_frozen,
+        'frozen_reason': frozen_reason if new_order_frozen else '',
+        'stocks': stocks,
+        'stop_loss_rules': {
+            'hard_stop_pct': risk_config.get('hard_stop_pct', -7.0),
+            'warning_pct': risk_config.get('stop_warning_pct', -5.0),
+            'trailing_stop_pct': risk_config.get('trailing_stop_pct', -3.0),
+            'trailing_profit_threshold_pct': risk_config.get('trailing_profit_threshold_pct', 5.0),
+            'trailing_stop_enabled': True,
+        },
+        '_source': 'patrol_fallback',  # 标记来源为兜底解析
+    }
+
+
 # ==================== 主函数 ====================
 def run():
     now = datetime.datetime.now()
@@ -788,21 +986,9 @@ def run():
     candidates = cand_data.get('candidates', {})
 
     # 2.1 决策网关：读取当日决策开关（冰点防御闭环）
-    decision_flags = {}
-    try:
-        df_path = BASE.parent / 'trading' / 'decision_flags.json'
-        if df_path.exists():
-            with open(df_path) as df:
-                decision_flags = json.load(df)
-            frozen = decision_flags.get('new_order_frozen', False)
-            if frozen:
-                frozen_reason = decision_flags.get('frozen_reason', '')
-                print(f"🛡️  决策网关: ❌ 新开仓冻结 — {frozen_reason}")
-            else:
-                pos_limit_str = decision_flags.get('position_limit', '正常')
-                print(f"🛡️  决策网关: ✅ 新开仓允许 — 仓位上限{pos_limit_str}")
-    except Exception as e:
-        print(f"⚠️ 决策网关读取失败: {e}")
+    # v1.1: 增加兜底解析 — 若 decision_flags.json 不存在（时序竞态），
+    # 自行解析最新盘前报告构建临时决策开关，消除巡检与网关之间的竞态窗口。
+    decision_flags = _load_decision_flags_with_fallback()
 
     # 合并所有需要行情的代码
     all_codes = set()
