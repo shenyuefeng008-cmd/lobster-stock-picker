@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""龙虾买点检测器 v1.1 — 检测买点并自动写入模拟交易仓（含开盘时间验证）"""
+"""龙虾买点检测器 v1.2 — 检测买点并自动写入模拟交易仓（含开盘时间验证）
+v1.2: 修复腾讯API字段索引bug(p[4]昨收→p[3]当前价) + 幻影价防护 + 决策网关冻结检查"""
 
 import json, subprocess, re, sys, datetime, os, os
 from pathlib import Path
@@ -522,7 +523,7 @@ def run():
                 p = m.group(2).split("~")
                 if len(p) > 37:
                     code = p[2]
-                    quotes[code] = {"price": float(p[4]), "pct": float(p[32])}  # p[4]=当前价, p[3]=昨收
+                    quotes[code] = {"price": float(p[3]), "pct": float(p[32])}  # p[3]=当前价, p[4]=昨收
         
         # 检测卖点
         sell_signals = detect_sell_signals(quotes)
@@ -638,12 +639,56 @@ def run():
             if len(p) > 37:
                 code = p[2]
                 quotes[code] = {
-                    'price': float(p[4]),  # p[4]=当前价, p[3]=昨收
+                    'price': float(p[3]),  # p[3]=当前价, p[4]=昨收
                     'pct': float(p[32]),
                     'vol_wan': float(p[36]),
-                    'amt_wan': float(p[37])
+                    'amt_wan': float(p[37]),
+                    'prev_close': float(p[4]) if len(p) > 4 else 0,  # 昨收，用于幻影价校验
                 }
-    
+
+    # ── 幻影价防护 v1.0 ──
+    # 校验腾讯API返回的价格是否等于昨收（stale数据，高开股开盘瞬间可能短暂返回昨收价）
+    MAX_DEVIATION_FROM_CLOSE = 0.10  # 偏离昨收超过±10%视为极端异常
+    phantom_rejects = []
+    for code in list(quotes.keys()):
+        q = quotes[code]
+        prev_close = q.get('prev_close', 0)
+        price = q['price']
+        pct_val = q['pct']
+        if prev_close > 0:
+            # 检查1: 价格是否等于昨收价（stale数据，高开股开盘瞬间）
+            is_stale = abs(price - prev_close) < 0.01 and abs(pct_val) < 0.01
+            # 检查2: 价格是否偏离昨收超±MAX%（极端异常值）
+            is_outlier = (price < prev_close * (1 - MAX_DEVIATION_FROM_CLOSE)
+                          or price > prev_close * (1 + MAX_DEVIATION_FROM_CLOSE))
+            if is_stale or is_outlier:
+                phantom_rejects.append((code, price, prev_close, pct_val, is_stale, is_outlier))
+                del quotes[code]
+    if phantom_rejects:
+        for code, price, pc, pct_val, stale, outlier in phantom_rejects:
+            tag = 'stale=昨收' if stale else 'outlier'
+            print(f"⚠️ 幻影价拒绝({code}): price={price}, 昨收={pc}, "
+                  f"pct={pct_val}%, {tag} → 跳过买入", file=sys.stderr)
+
+    # ── 决策网关冻结检查 v1.0 ──
+    df_path = ROOT / 'trading' / 'decision_flags.json'
+    gate_frozen = False
+    gate_stocks = {}
+    gate_reason = ''
+    if df_path.exists():
+        try:
+            with open(df_path) as df:
+                gate = json.load(df)
+            gate_frozen = gate.get('new_order_frozen', False)
+            gate_stocks = gate.get('stocks', {})
+            if gate_frozen:
+                gate_reason = gate.get('frozen_reason', '')
+                print(f"🛡️  决策网关: ❌ 新开仓冻结 — {gate_reason}")
+        except Exception as e:
+            print(f"⚠️ 决策网关读取失败: {e}", file=sys.stderr)
+    else:
+        print("⚠️ decision_flags.json 不存在，不冻结（确保不遗漏）")
+
     # 逐维度检测买点（涨停/破位删除，其他保留）
     triggers = []
     
@@ -680,6 +725,14 @@ def run():
                 item['status'] = '催化剂否决'
                 new_10.append(item)
                 continue
+
+            # 决策网关冻结检查
+            if gate_frozen:
+                stock_key = str(code)
+                if stock_key not in gate_stocks or gate_stocks[stock_key].get('allow_buy', True):
+                    print(f"  ⏸️  {name}({code}) 网关冻结({gate_reason})，跳过")
+                    new_10.append(item)
+                    continue
             
             pos_pct = POSITION_PCT_MAP.get('1.0分歧低吸', 10)
             sector = item.get('sector', item.get('track', ''))
@@ -733,6 +786,14 @@ def run():
                 item['status'] = '催化剂否决'
                 new_20.append(item)
                 continue
+
+            # 决策网关冻结检查
+            if gate_frozen:
+                stock_key = str(code)
+                if stock_key not in gate_stocks or gate_stocks[stock_key].get('allow_buy', True):
+                    print(f"  ⏸️  {name}({code}) 网关冻结({gate_reason})，跳过")
+                    new_20.append(item)
+                    continue
             
             pos_pct = POSITION_PCT_MAP.get('2.0板块卡位', 10)
             sector = item.get('sector', item.get('track', ''))
@@ -813,6 +874,14 @@ def run():
                 item['status'] = '催化剂否决'
                 new_30.append(item)
                 continue
+
+            # 决策网关冻结检查
+            if gate_frozen:
+                stock_key = str(code)
+                if stock_key not in gate_stocks or gate_stocks[stock_key].get('allow_buy', True):
+                    print(f"  ⏸️  {name}({code}) 网关冻结({gate_reason})，跳过")
+                    new_30.append(item)
+                    continue
             
             # C+B：辅助模式仓位上限10%，正常模式按配置
             _3r = get_30_emotion_rules()
