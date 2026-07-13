@@ -7,7 +7,7 @@
 用法：python3 scripts/lobster_premarket_engine.py
 """
 
-import json, subprocess, re, sys, datetime, os, time
+import json, shlex, subprocess, re, sys, datetime, os, time
 from pathlib import Path
 
 # node 二进制路径（shell executor 的 PATH 不含 /usr/local/bin）
@@ -59,7 +59,7 @@ EMOTION_RULES = load_config().get('emotion', _DEFAULT_CONFIG['emotion'])
 # ==================== 工具函数 ====================
 
 def run(cmd, timeout=20):
-    r = subprocess.run(cmd, shell=True, capture_output=True, timeout=timeout)
+    r = subprocess.run(shlex.split(cmd), capture_output=True, timeout=timeout)
     try:
         return r.stdout.decode('utf-8').strip()
     except UnicodeDecodeError:

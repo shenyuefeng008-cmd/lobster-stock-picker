@@ -15,9 +15,9 @@ STOCK_NAME = "万通发展"
 def get_realtime_quote():
     """获取腾讯行情API实时数据"""
     try:
-        cmd = f"curl -s 'https://qt.gtimg.cn/q={STOCK_CODE}' | iconv -f gbk -t utf-8"
-        result = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=15)
-        content = result.stdout.strip()
+        result = subprocess.run(["curl", "-s", f"https://qt.gtimg.cn/q={STOCK_CODE}"],
+                                capture_output=True, timeout=15)
+        content = result.stdout.decode('gbk', errors='replace').strip()
         
         # 解析 v_sh600246="..." 格式
         match = re.search(r'="(.+)"', content)
