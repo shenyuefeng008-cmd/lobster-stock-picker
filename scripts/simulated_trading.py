@@ -805,7 +805,7 @@ def sell(code, sell_price, reason, sell_type="止损"):
                     print(f"⚠️ 催化剂验证更新失败: {e}", file=sys.stderr)
         
         emoji = "🟢" if pnl >= 0 else "🔴"
-        return f"{emoji} 卖出 {p['name']}({code}) {shares}股@{actual_price:.2f}（滑点-{SLIPAGE_SELL*100:.1f}%）盈亏{pnl:+.0f}({pnl_pct:+.1f}%) 持{hold_days}天"
+        return f"{emoji} 卖出 {p['name']}({code}) {shares}股@{actual_price:.2f}（滑点-{SLIPAGE_SELL*100:.1f}%）盈亏{pnl:+.0f}({pnl_pct:+.1f}%) 持{hold_days}个交易日"
     
     return f"⚠️ {code} 不在持仓中"
 
@@ -1137,7 +1137,7 @@ def status():
         for t in reversed(recent):
             emoji = "🟢" if t['pnl'] >= 0 else "🔴"
             sell_time = f" {t['time'][-8:]}" if t.get('time') else ""
-            lines.append(f"  {t['date']}{sell_time} {emoji}{t['name']}({t['code']}) {t['pnl']:+.0f}({t['pnl_pct']:+.1f}%) 持{t['hold_days']}天 [{t['sell_type']}]")
+            lines.append(f"  {t['date']}{sell_time} {emoji}{t['name']}({t['code']}) {t['pnl']:+.0f}({t['pnl_pct']:+.1f}%) 持{t['hold_days']}个交易日 [{t['sell_type']}]")
     
     return "\n".join(lines)
 
@@ -1300,7 +1300,7 @@ def weekly_summary():
         "胜率": f"{win_rate:.1f}%",
         "盈利笔数": len(wins),
         "亏损笔数": len(sells) - len(wins),
-        "平均持有天数": f"{avg_hold:.1f}",
+        "平均持有交易日": f"{avg_hold:.1f}",
         "错误反馈报告": str(report_file)
     }
 

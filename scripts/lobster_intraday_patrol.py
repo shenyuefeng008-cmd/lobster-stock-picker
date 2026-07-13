@@ -493,7 +493,7 @@ def detect_sellpoints(positions, quotes):
 
         # 1.0 时间止损
         if not reason and '1.0' in dim and hold_days >= 3 and pnl_pct < 9.8:
-            reason = f"1.0时间止损：持仓{hold_days}天未涨停"
+            reason = f"1.0时间止损：持仓{hold_days}个交易日未涨停"
 
         # 3.0 窄止损
         if not reason and '3.0' in dim and pnl_pct <= -3.0:
@@ -539,7 +539,7 @@ def detect_sellpoints(positions, quotes):
 
         # 通用时间止损
         if not reason and hold_days >= MAX_HOLD_DAYS:
-            reason = f"时间止损：持仓{hold_days}天 ≥ {MAX_HOLD_DAYS}天"
+            reason = f"时间止损：持仓{hold_days}个交易日 ≥ {MAX_HOLD_DAYS}个交易日"
 
         if reason:
             if '止损' in reason:

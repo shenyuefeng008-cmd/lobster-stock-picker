@@ -158,7 +158,7 @@ def detect_sellpoint(position, current_price):
     if '1.0' in dimension:
         # 时间止损：第3个交易日未涨停
         if hold_days >= 3 and abs(current_price - buy_price) / buy_price < 0.098:
-            return f"1.0时间止损：持仓{hold_days}天未涨停，次日竞价卖出", None
+            return f"1.0时间止损：持仓{hold_days}个交易日未涨停，次日竞价卖出", None
         # 硬止损
         sl_pct = STOP_LOSS_PCT_MAP.get(dimension, -5.0)
         if pnl_pct <= sl_pct:
@@ -186,9 +186,9 @@ def detect_sellpoint(position, current_price):
     # 时间止损（按维度从config读取max_hold_days）
     dim_max_days = _get_dim_max_hold_days(dimension)
     if hold_days >= dim_max_days:
-        return f"时间止损：持仓{hold_days}天 ≥ {dim_max_days}天(dim:{dimension})", None
+        return f"时间止损：持仓{hold_days}个交易日 ≥ {dim_max_days}个交易日(dim:{dimension})", None
     
-    return None, f"未触发卖点（盈亏{pnl_pct:+.2f}%，持仓{hold_days}天）"
+    return None, f"未触发卖点（盈亏{pnl_pct:+.2f}%，持仓{hold_days}个交易日）"
 
 def run():
     """主函数：检测所有持仓的卖点"""
