@@ -306,22 +306,38 @@ def auto_execute(decisions):
                 r = sell_partial(code, 50, q["price"], s["reason"], "止盈")
                 results.append(r)
     
-    # 2. 执行买入
-    for b in decisions.get("buy_signals", {}).get("signals", [])[:2]:  # 最多2只
-        code = b["code"]
-        name = b["name"]
-        pct_pos = b.get("pct_position", 10)
-        
-        # 检查是否已有持仓
-        if any(p["code"] == code for p in positions):
-            continue
-        
-        # 获取当前价
-        q = get_realtime_quotes([code]).get(code, {})
-        if q:
-            r = buy(code, name, q["price"], b.get("reason", ""), b.get("dimension", ""), position_pct=pct_pos)
-            if "禁止" not in r:  # 排除非交易时段等拒绝
-                results.append(r)
+    # 2. 执行买入（先检查决策网关冻结标志）
+    flags_file = ROOT / "trading" / "decision_flags.json"
+    new_order_frozen = False
+    frozen_reason = ""
+    if flags_file.exists():
+        try:
+            with open(flags_file) as f:
+                flags = json.load(f)
+            if flags.get("new_order_frozen"):
+                new_order_frozen = True
+                frozen_reason = flags.get("frozen_reason", "")
+        except Exception:
+            pass
+
+    if new_order_frozen:
+        results.append(f"决策网关已冻结新开仓({frozen_reason})，跳过所有买入")
+    else:
+        for b in decisions.get("buy_signals", {}).get("signals", [])[:2]:  # 最多2只
+            code = b["code"]
+            name = b["name"]
+            pct_pos = b.get("pct_position", 10)
+            
+            # 检查是否已有持仓
+            if any(p["code"] == code for p in positions):
+                continue
+            
+            # 获取当前价
+            q = get_realtime_quotes([code]).get(code, {})
+            if q:
+                r = buy(code, name, q["price"], b.get("reason", ""), b.get("dimension", ""), position_pct=pct_pos)
+                if "禁止" not in r:  # 排除非交易时段等拒绝
+                    results.append(r)
     
     return "\n".join(results) if results else "无自动执行"
 
